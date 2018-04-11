@@ -86,6 +86,7 @@ public class HelloWorldApplet extends Applet {
             Util.arrayCopyNonAtomic(bArray, (short) (bOffset + 1), initParamsBytes, (short) 0, aLen);
         }
         transientMemory = JCSystem.makeTransientByteArray(LENGTH_ECHO_BYTES, JCSystem.CLEAR_ON_RESET);
+
         register();
     }
 
