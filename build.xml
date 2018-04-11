@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project basedir="." default="dist" name="ant-javacard build">
+  <!-- Build and load the JavaCard task -->
+  <target name="jcpro" depends="clean">
+    <mkdir dir="build"/>
+    <javac srcdir="src/main/java/pro/javacard/ant" destdir="build" includeantruntime="true" target="1.8" source="1.8">
+      <compilerarg value="-Xlint:all"/>
+    </javac>
+    <!-- Load the fresh task -->
+    <taskdef name="javacard" classname="pro.javacard.ant.JavaCard" classpath="build"/>
+    <!--<taskdef name="javacard" classname="pro.javacard.ant.JavaCard" classpath="./ant-javacard.jar"/>-->
+  </target>
+  <!-- Package it into a JAR -->
+  <target name="dist" depends="jcpro">
+    <jar destfile="lib/ant-javacard.jar" level="9" basedir="build">
+      <manifest>
+        <attribute name="Main-Class" value="pro.javacard.ant.DummyMain"/>
+      </manifest>
+    </jar>
+    <!-- Now this JAR can be used in your build.xml by placing the jar to -->
+    <!-- lib folder and having the following in your target: -->
+    <taskdef name="javacard" classname="pro.javacard.ant.JavaCard" classpath="lib/ant-javacard.jar"/>
+  </target>
+  <!-- Some handy things -->
+  <property name="JC212" value="sdks/jc212_kit"/>
+  <property name="JC221" value="sdks/jc221_kit"/>
+  <property name="JC222" value="sdks/jc222_kit"/>
+  <property name="JC303" value="sdks/jc303_kit"/>
+  <property name="JC304" value="sdks/jc304_kit"/>
+  <property name="JC305" value="sdks/jc305u1_kit"/>
+  <property name="JC305_2" value="sdks/jc305u2_kit"/>
+  <!-- Build test applets -->
+  <target name="test" depends="dist">
+    <javacard>
+      <cap jckit="sdks/jc212_kit" aid="0102030405" output="MyApplet.cap" sources="src/main/java/be/msec/smartcard/">
+        <applet class="be.msec.smartcard.HelloWorldApplet" aid="0102030405060708"/>
+      </cap>
+    </javacard>
+  </target>
+  <target name="clean">
+    <delete dir="build"/>
+  </target>
+</project>

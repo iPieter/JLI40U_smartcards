@@ -1,0 +1,11 @@
+gp mode_201
+gp gemXpressoPro
+gp enable_trace
+gp establish_context
+gp card_connect
+gp select -AID A000000018434D00
+gp open_sc -security 3 -keyind 0 -keyver 0 -key 47454d5850524553534f53414d504c45 // Open secure channel
+gp delete -AID 0102030405060708090000
+gp delete -AID 01020304050607080900
+gp install -file smartcard.cap -priv 04 -sdAID A000000018434D00 -nvCodeLimit 4000
+gp card_disconnect release_context
