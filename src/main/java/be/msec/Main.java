@@ -50,7 +50,7 @@ public class Main extends Application
 
     public static void main( String[] args )
     {
-        boolean PRINT_SHITTY_KEY = false;
+        boolean PRINT_SHITTY_KEY = true;
 
         if( PRINT_SHITTY_KEY )
         {
@@ -66,25 +66,26 @@ public class Main extends Application
 
                 System.out.println(inputStream.readObject());
 
+
+
                 inputStream.close();
                 socket.close();
 
-                KeyStore keyStore = createKeyStore( "/home/anton/Desktop/ku leuven/vakken/semester 8/veilige software/JLI40U_smartcards/res/TIME_keys.jks", "" );
+                SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
 
-                RSAPublicKey key = (RSAPublicKey ) keyStore.getCertificate( "time" ).getPublicKey();
+                RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey();
                 System.out.println( Arrays.toString( key.getPublicExponent().toByteArray() ) );
                 System.out.println( Arrays.toString( key.getModulus().toByteArray() ) );
 
                 System.out.println( key.getModulus().toByteArray().length );
 
-                RSAPrivateKey privateKey = (RSAPrivateKey) keyStore.getKey( "time", "password".toCharArray() );
+                //RSAPrivateKey privateKey = (RSAPrivateKey) keyStore.getKey( "time", "password".toCharArray() );
 
-                Signature signature = Signature.getInstance( "SHA1withRSA" );
-                signature.initSign( privateKey );
-                signature.update( new byte[]{0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04} );
-
-                System.out.println( Arrays.toString( signature.sign() ) );
-                System.out.println( signature.sign().length );
+                //Signature signature = Signature.getInstance( "SHA1withRSA" );
+                //signature.initSign( privateKey );
+                //signature.update( new byte[]{0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04} );
+                //System.out.println( Arrays.toString( signature.sign() ) );
+                //System.out.println( signature.sign().length );
             }
             catch ( KeyStoreException e )
             {
@@ -102,15 +103,11 @@ public class Main extends Application
             {
                 e.printStackTrace();
             }
-            catch ( UnrecoverableKeyException e )
+            catch ( ClassNotFoundException e )
             {
                 e.printStackTrace();
             }
-            catch ( InvalidKeyException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( SignatureException e )
+            catch ( KeyManagementException e )
             {
                 e.printStackTrace();
             }

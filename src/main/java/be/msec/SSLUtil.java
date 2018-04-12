@@ -105,4 +105,8 @@ public class SSLUtil
         return key;
     }
 
+    public static PublicKey getPublicKey() throws KeyStoreException
+    {
+        return keyStore.getCertificate( "time" ).getPublicKey();
+    }
 }
