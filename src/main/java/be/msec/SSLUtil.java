@@ -4,7 +4,6 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.*;
 import java.security.cert.CertificateException;
@@ -17,25 +16,56 @@ public class SSLUtil
     private static String TRUST_MANAGER_TYPE = "SunX509";
     private static String PROTOCOL           = "TLS";
 
+    private static KeyStore keyStore = null;
+    private static String keyStorePassword;
+
     private static SSLContext serverSSLCtx = null;
     private static SSLContext clientSSLCtx = null;
 
-    public static SSLContext createServerSSLContext( final String keyStoreLocation,
-                                                     final String keyStorePwd )
+    /**
+     * Client or server agnostic method to create a key store based on a jks file.
+     *
+     * @param keyStoreLocation Path to the key store.
+     * @param keyStorePassword Password to open the key store.
+     * @throws KeyStoreException
+     * @throws IOException
+     * @throws CertificateException
+     * @throws NoSuchAlgorithmException
+     */
+    public static void createKeyStore( final String keyStoreLocation, final String keyStorePassword )
+            throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException
+    {
+        SSLUtil.keyStorePassword = keyStorePassword;
+        keyStore = KeyStore.getInstance( KEY_STORE_TYPE );
+        keyStore.load( new FileInputStream( keyStoreLocation ), keyStorePassword.toCharArray() );
+    }
+
+    /**
+     * Create or obtain an ssl context for the server, based on the keystore from {@link #createKeyStore(String, String)}.
+     *
+     * @return The created ssl context
+     * @throws KeyStoreException
+     * @throws NoSuchAlgorithmException
+     * @throws CertificateException
+     * @throws IOException
+     * @throws UnrecoverableKeyException
+     * @throws KeyManagementException
+     */
+    public static SSLContext createServerSSLContext()
             throws KeyStoreException,
             NoSuchAlgorithmException,
             CertificateException,
-            FileNotFoundException,
             IOException,
             UnrecoverableKeyException,
             KeyManagementException
     {
+        assert keyStore != null; //initialize key store first
+
         if ( serverSSLCtx == null )
         {
-            KeyStore keyStore = KeyStore.getInstance( KEY_STORE_TYPE );
-            keyStore.load( new FileInputStream( keyStoreLocation ), keyStorePwd.toCharArray() );
+
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance( KEY_MANAGER_TYPE );
-            keyManagerFactory.init( keyStore, keyStorePwd.toCharArray() );
+            keyManagerFactory.init( keyStore, keyStorePassword.toCharArray() );
             serverSSLCtx = SSLContext.getInstance( PROTOCOL );
             serverSSLCtx.init( keyManagerFactory.getKeyManagers(), null, null );
         }
@@ -43,12 +73,11 @@ public class SSLUtil
         return serverSSLCtx;
     }
 
-    public static SSLContext createClientSSLContext( final String trustStoreLocation,
-                                                     final String trustStorePwd )
+
+    public static SSLContext createClientSSLContext( final String trustStoreLocation, final String trustStorePwd )
             throws KeyStoreException,
             NoSuchAlgorithmException,
             CertificateException,
-            FileNotFoundException,
             IOException,
             KeyManagementException
     {
@@ -65,6 +94,15 @@ public class SSLUtil
 
         return clientSSLCtx;
 
+    }
+
+    public static Key getPrivateKey() throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException
+    {
+        assert keyStore != null;
+
+        Key key = keyStore.getKey( "time", "password".toCharArray() );
+
+        return key;
     }
 
 }
