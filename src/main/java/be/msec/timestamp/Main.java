@@ -6,12 +6,13 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.TreeSet;
 
 /**
@@ -44,23 +45,24 @@ public class Main
             SSLServerSocket        s   = (SSLServerSocket) ssf.createServerSocket( 1207 );
             Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
-            SSLSocket c = (SSLSocket) s.accept();
-
-
-            DataInputStream is = new DataInputStream( c.getInputStream() );
-            PrintStream     os = new PrintStream( c.getOutputStream() );
             while ( true )
             {
-                signature.update( "123456".getBytes() );
+                SSLSocket c = (SSLSocket) s.accept();
 
-                byte[] sig = signature.sign();
 
-                System.out.println("SIGNED ('123456'): " + sigLength);
+                //DataInputStream is = new DataInputStream( c.getInputStream() );
+                ObjectOutputStream os = new ObjectOutputStream( c.getOutputStream() );
 
-                String input  = is.readUTF();
-                String ketqua = input.toUpperCase();
-                os.println( ketqua );
+                Date date = new Date();
+
+                SignedTimestamp signedTimestamp = new SignedTimestamp( date.getTime(), signature );
+
+                os.writeObject( signedTimestamp );
+
+                os.close();
+                c.close();
             }
+
         }
         catch ( IOException e )
         {

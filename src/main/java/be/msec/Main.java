@@ -1,10 +1,7 @@
 package be.msec;
 
 import javax.net.ssl.*;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
@@ -34,17 +31,12 @@ public class Main
             //socket.setEnabledCipherSuites( enabledCipherSuites );
 
             Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
+            ObjectInputStream inputStream = new ObjectInputStream( socket.getInputStream() );
 
+                System.out.println(inputStream.readObject());
 
-            console = new DataInputStream( System.in );
-            streamOut = new DataOutputStream( socket.getOutputStream() );
-
-            while ( true )
-            {
-                String input  = "TEST";
-                String ketqua = input.toUpperCase();
-                streamOut.writeUTF( ketqua );
-            }
+            inputStream.close();
+            socket.close();
         }
         catch ( IOException e )
         {
@@ -63,6 +55,10 @@ public class Main
             e.printStackTrace();
         }
         catch ( KeyManagementException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( ClassNotFoundException e )
         {
             e.printStackTrace();
         }
