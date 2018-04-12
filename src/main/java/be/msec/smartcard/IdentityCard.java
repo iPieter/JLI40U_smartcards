@@ -1,7 +1,9 @@
 package be.msec.smartcard;
 
 import be.msec.DataUtils;
+import com.licel.jcardsim.crypto.RSAKeyImpl;
 import javacard.framework.*;
+import javacard.security.*;
 
 import java.math.BigInteger;
 
@@ -12,6 +14,7 @@ public class IdentityCard extends Applet
     private static final byte VALIDATE_PIN_INS = 0x22;
     private static final byte GET_SERIAL_INS   = 0x24;
     private static final byte UPDATE_TIME_INS  = 0x26;
+    private static final byte TEST_SIGNATURE_INS  = 0x28;
 
     private final static byte PIN_TRY_LIMIT = ( byte ) 0x03;
     private final static byte PIN_SIZE      = ( byte ) 0x04;
@@ -28,6 +31,9 @@ public class IdentityCard extends Applet
     private byte[] currentTime = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     private static final byte[] timeDelta = new byte[] {0, 0, 0, 0, 5, 38, 92, 0}; //24 hours
     private byte isTimeOK = 0;
+    private byte[] timestampExponent = new byte[] {1, 0, 1};
+    private byte[] timestampModulus = new byte[] {0, -116, 35, -92, 85, 71, 55, -43, 71, -69, 111, 122, -103, -61, -6, 95, -29, -126, -91, -79, 0, 61, 42, 27, -88, 38, -91, 23, 42, -116, -60, 118, -111, -3, -120, -8, 116, 10, 92, 75, -82, -81, -2, -111, -24, -59, -18, -47, 61, -71, -89, -96, -109, 76, 84, 57, 87, -89, -32, 124, -74, -41, -74, 19, -3, -122, 20, 27, 115, 57, -123, 2, -15, 39, 97, 51, -1, -15, 123, -9, 127, -93, 85, 107, -26, 71, -67, -29, -86, 35, -18, -105, -109, -41, -40, 11, 28, -49, 85, -76, -10, 5, -105, -22, 22, 4, 59, -7, 23, -110, 12, 19, -114, 107, 48, 66, -32, -45, 2, -105, 78, -67, -51, 87, 3, -29, -101, -36, -29, 2, -14, 47, -69, -95, -113, 7, -14, 107, 66, -81, 69, -80, -63, -37, 36, 88, -110, 91, -31, 91, -33, -19, 125, 65, -36, 55, 41, -48, 9, -31, 36, 66, 100, 10, 45, 55, -114, -60, -51, -13, -79, 3, -31, 114, 17, -7, -6, -82, 100, -79, 119, -27, 80, -80, -109, 38, 48, -101, -28, -47, 57, 106, -5, 103, -35, -72, 126, 101, 98, -33, -1, -65, -112, 106, -84, 83, -18, 99, 84, 107, -83, 100, -62, 11, -46, 73, -41, -17, 73, -28, 86, 12, 20, -61, 120, -51, 84, -21, -89, 51, 98, 60, -73, -65, -100, -88, -98, 72, 5, -115, -80, 123, 53, 32, -78, -49, 33, -27, 0, 78, -104, -110, -57, 9, 90, 2, -97};
+    private RSAPublicKey timestampPublicKey;
 
     private IdentityCard()
     {
@@ -37,7 +43,11 @@ public class IdentityCard extends Applet
 		 */
         pin = new OwnerPIN( PIN_TRY_LIMIT, PIN_SIZE );
         pin.update( new byte[]{ 0x01, 0x02, 0x03, 0x04 }, ( short ) 0, PIN_SIZE );
-		
+
+        timestampPublicKey = (RSAPublicKey ) KeyBuilder.buildKey( KeyBuilder.TYPE_RSA_PUBLIC, (short)5, false );
+        timestampPublicKey.setExponent( timestampExponent, (short)0, (short) timestampExponent.length );
+        timestampPublicKey.setModulus( timestampModulus, (short)0, (short) timestampModulus.length );
+
 		/*
 		 * This method registers the applet with the JCRE on the card.
 		 */
@@ -90,6 +100,9 @@ public class IdentityCard extends Applet
             case UPDATE_TIME_INS:
                 shouldUpdateTime( apdu );
                 break;
+            case TEST_SIGNATURE_INS:
+                testSignature( apdu );
+                break;
             //If no matching instructions are found it is indicated in the status word of the response.
             //This can be done by using this method. As an argument a short is given that indicates
             //the type of warning. There are several predefined warnings in the 'ISO7816' class.
@@ -104,7 +117,7 @@ public class IdentityCard extends Applet
 
         byte reqValidation = Util.arrayCompare( DataUtils.add( currentTime, timeDelta ), (short)0, buffer, (short)0, (short)8 );
 
-        isTimeOK = (byte)(reqValidation == (byte)(-1) ? 1 : 0);
+        isTimeOK = (byte)(reqValidation == (byte)(-1) ? (byte)1 : (byte)0);
 
         Util.arrayCopy( buffer, (short)0, currentTime, (short)0, (short)8 );
 
@@ -113,6 +126,20 @@ public class IdentityCard extends Applet
         apdu.setOutgoing();
         apdu.setOutgoingLength( ( short ) 1 );
         apdu.sendBytesLong( new byte[]{ isTimeOK }, (short) 0, (short)1 );
+    }
+
+    private void testSignature( APDU apdu )
+    {
+        byte [] buffer = apdu.getBuffer();
+
+        Signature  signature = Signature.getInstance( Signature.ALG_RSA_SHA_PKCS1, false ) ;
+
+        signature.init( timestampPublicKey, Signature.MODE_VERIFY );
+        byte isSignatureOK = ( signature.verify( buffer, (short)0, (short)8, buffer, (short)8, (short)16 ) ? (byte)1 : (byte)0);
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength( ( short ) 1 );
+        apdu.sendBytesLong( new byte[]{ isSignatureOK }, (short) 0, (short)1 );
     }
 
     /*
