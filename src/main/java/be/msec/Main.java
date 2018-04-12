@@ -1,14 +1,13 @@
 package be.msec;
 
-import be.msec.smartcard.HelloWorldApplet;
-import be.msec.smartcard.IdentityCard;
-import com.licel.jcardsim.base.Simulator;
-import javacard.framework.AID;
-
-import javax.smartcardio.CommandAPDU;
-import javax.smartcardio.ResponseAPDU;
-
-import static org.junit.Assert.assertEquals;
+import javax.net.ssl.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.security.*;
+import java.security.cert.CertificateException;
+import java.util.Arrays;
 
 /**
  * @author Pieter
@@ -16,25 +15,56 @@ import static org.junit.Assert.assertEquals;
  */
 public class Main
 {
+    private static SSLSocket        socket    = null;
+    private static Thread           thread    = null;
+    private static DataInputStream  console   = null;
+    private static DataOutputStream streamOut = null;
+
+    private static final char[] passphrase = "password".toCharArray();
+
     public static void main( String[] args )
     {
-        // 1. create simulator
-        Simulator simulator = new Simulator();
 
-        // 2. install applet
-        AID appletAID = AIDUtil.create( "F000000001" );
-        simulator.installApplet( appletAID, HelloWorldApplet.class );
+        try
+        {
 
-        // 3. select applet
-        simulator.selectApplet( appletAID );
+            SSLContext context = SSLUtil.createClientSSLContext( "CA.jks", "password" );
 
-        // 4. send APDU
-        CommandAPDU  commandAPDU = new CommandAPDU( 0x00, 0x01, 0x00, 0x00 );
-        ResponseAPDU response    = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1207 );
+            //socket.setEnabledCipherSuites( enabledCipherSuites );
 
-        System.out.println(response);
+            Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
 
-        // 5. check response
-        assertEquals( 0x9000, response.getSW() );
+
+            console = new DataInputStream( System.in );
+            streamOut = new DataOutputStream( socket.getOutputStream() );
+
+            while ( true )
+            {
+                String input  = "TEST";
+                String ketqua = input.toUpperCase();
+                streamOut.writeUTF( ketqua );
+            }
+        }
+        catch ( IOException e )
+        {
+            System.out.print( e );
+        }
+        catch ( CertificateException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( NoSuchAlgorithmException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( KeyStoreException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( KeyManagementException e )
+        {
+            e.printStackTrace();
+        }
     }
 }

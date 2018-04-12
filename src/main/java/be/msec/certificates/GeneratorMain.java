@@ -20,7 +20,7 @@ import java.util.Arrays;
  */
 public class GeneratorMain
 {
-    public static String[] PROVIDERS = { "GOV1", "GOV2", "SOCNET1", "SOCNET2", "DEFAULT1", "DEFAULT2", "CUSTOM1", "CUSTOM2" };
+    public static String[] PROVIDERS = { "GOV1", "GOV2", "SOCNET1", "SOCNET2", "DEFAULT1", "DEFAULT2", "CUSTOM1", "CUSTOM2", "TIME" };
 
     public static void main( String[] args )
     {
@@ -32,6 +32,8 @@ public class GeneratorMain
             PrivateKey rootPrivateKey = keyGen.getPrivateKey();
 
             X509Certificate rootCertificate = keyGen.getSelfCertificate( new X500Name( "CN=ROOT" ), (long) 365 * 24 * 60 * 60 );
+
+            storeKeyAndCertificateChain( "CA", "password".toCharArray(), "CA.jks", rootPrivateKey, new X509Certificate[]{ rootCertificate } );
 
             Arrays.stream( PROVIDERS ).forEach( name -> generateLeafProvider( name, rootCertificate, rootPrivateKey ) );
         }
@@ -67,26 +69,27 @@ public class GeneratorMain
             keyGen2.generate( 2048 );
             PrivateKey topPrivateKey = keyGen2.getPrivateKey();
 
-            X509Certificate topCertificate = keyGen2.getSelfCertificate( new X500Name( "CN=TOP" ), (long) 31 * 24 * 60 * 60 );
+            X509Certificate topCertificate = keyGen2.getSelfCertificate( new X500Name( "CN=" + provider ), (long) 31 * 24 * 60 * 60 );
 
-            rootCertificate = createSignedCertificate( "ROOT", rootCertificate, rootCertificate, rootPrivateKey );
-            topCertificate = createSignedCertificate( provider, topCertificate, rootCertificate, rootPrivateKey );
+            //rootCertificate = createSignedCertificate( "ROOT", rootCertificate, rootCertificate, rootPrivateKey );
+            topCertificate = createSignedCertificate( "CN=" + provider, topCertificate, rootCertificate, rootPrivateKey );
+            //topCertificate = createSignedCertificate( "CN=" + provider, topCertificate, rootCertificate, rootPrivateKey );
 
             X509Certificate[] chain = new X509Certificate[2];
             chain[0] = topCertificate;
             chain[1] = rootCertificate;
 
             char[] password = "password".toCharArray();
-            String keystore = provider +"_keys.jks";
+            String keystore = provider + "_keys.jks";
 
             //Store the certificate chain
             storeKeyAndCertificateChain( provider, password, keystore, topPrivateKey, chain );
 
             //Reload the keystore and display key and certificate chain info
-            loadAndDisplayChain( provider, password, keystore );
+            //loadAndDisplayChain( provider, password, keystore );
 
             //Clear the keystore
-            clearKeyStore( provider, password, keystore );
+            //clearKeyStore( provider, password, keystore );
 
         }
         catch ( Exception e )
@@ -138,16 +141,16 @@ public class GeneratorMain
 
             byte[]       inCertBytes = certificate.getTBSCertificate();
             X509CertInfo info        = new X509CertInfo( inCertBytes );
-            //info.set( X509CertInfo.SUBJECT, name );
+            info.set( X509CertInfo.ISSUER, issuer );
 
             //No need to add the BasicContraint for leaf cert
-            if ( !certificate.getSubjectDN().getName().equals( "CN=TOP" ) )
-            {
-                CertificateExtensions     exts = new CertificateExtensions();
-                BasicConstraintsExtension bce  = new BasicConstraintsExtension( true, -1 );
-                exts.set( BasicConstraintsExtension.NAME, new BasicConstraintsExtension( false, bce.getExtensionValue() ) );
-                info.set( X509CertInfo.EXTENSIONS, exts );
-            }
+            //if ( !certificate.getSubjectDN().getName().equals( "CN=TOP" ) )
+            //{
+            //    CertificateExtensions     exts = new CertificateExtensions();
+            //    BasicConstraintsExtension bce  = new BasicConstraintsExtension( true, -1 );
+            //    exts.set( BasicConstraintsExtension.NAME, new BasicConstraintsExtension( false, bce.getExtensionValue() ) );
+            //    info.set( X509CertInfo.EXTENSIONS, exts );
+            //}
 
             X509CertImpl outCert = new X509CertImpl( info );
             outCert.sign( issuerPrivateKey, issuerSigAlg );
