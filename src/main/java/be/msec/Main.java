@@ -29,30 +29,24 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Random;
 
+import javax.net.ssl.*;
+import java.io.*;
+import java.security.*;
+import java.security.cert.CertificateException;
+import java.util.Arrays;
+
 /**
  * @author Pieter
  * @version 1.0
  */
 public class Main extends Application
 {
-    /**
-     * Client or server agnostic method to create a key store based on a jks file.
-     *
-     * @param keyStoreLocation Path to the key store.
-     * @param keyStorePassword Password to open the key store.
-     * @throws KeyStoreException
-     * @throws IOException
-     * @throws CertificateException
-     * @throws NoSuchAlgorithmException
-     */
-    public static KeyStore createKeyStore( final String keyStoreLocation, final String keyStorePassword )
-            throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException
-    {
-        KeyStore keyStore = KeyStore.getInstance( "JKS" );
-        keyStore.load( new FileInputStream( keyStoreLocation ), "password".toCharArray() );
+    private static SSLSocket        socket    = null;
+    private static Thread           thread    = null;
+    private static DataInputStream  console   = null;
+    private static DataOutputStream streamOut = null;
 
-        return keyStore;
-    }
+    private static final char[] passphrase = "password".toCharArray();
 
     public static void main( String[] args )
     {
@@ -62,6 +56,19 @@ public class Main extends Application
         {
             try
             {
+                SSLContext context = SSLUtil.createClientSSLContext( "CA.jks", "password" );
+
+                socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1207 );
+                //socket.setEnabledCipherSuites( enabledCipherSuites );
+
+                Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
+                ObjectInputStream inputStream = new ObjectInputStream( socket.getInputStream() );
+
+                System.out.println(inputStream.readObject());
+
+                inputStream.close();
+                socket.close();
+
                 KeyStore keyStore = createKeyStore( "/home/anton/Desktop/ku leuven/vakken/semester 8/veilige software/JLI40U_smartcards/res/TIME_keys.jks", "" );
 
                 RSAPublicKey key = (RSAPublicKey ) keyStore.getCertificate( "time" ).getPublicKey();
