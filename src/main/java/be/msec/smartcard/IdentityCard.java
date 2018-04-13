@@ -2,10 +2,13 @@ package be.msec.smartcard;
 
 import be.msec.DataUtils;
 import com.licel.jcardsim.crypto.RSAKeyImpl;
+import com.licel.jcardsim.crypto.SymmetricCipherImpl;
 import javacard.framework.*;
 import javacard.security.*;
+import javacardx.crypto.Cipher;
 
 import java.math.BigInteger;
+import java.util.Random;
 
 public class IdentityCard extends Applet
 {
@@ -13,14 +16,22 @@ public class IdentityCard extends Applet
 
     private static final byte VALIDATE_PIN_INS = 0x22;
     private static final byte GET_SERIAL_INS   = 0x24;
-    private static final byte UPDATE_TIME_INS  = 0x26;
+
+    private static final byte SHOULD_UPDATE_TIME_INS  = 0x26;
+    private static final byte UPDATE_TIME_INS  = 0x27;
+
     private static final byte TEST_SIGNATURE_INS  = 0x28;
+
+    private static final byte CLEAR_BUFFER_INS = 0x30;
+    private static final byte UPDATE_BUFFER_INS = 0x31;
 
     private final static byte PIN_TRY_LIMIT = ( byte ) 0x03;
     private final static byte PIN_SIZE      = ( byte ) 0x04;
 
     private final static short SW_VERIFICATION_FAILED       = 0x6300;
     private final static short SW_PIN_VERIFICATION_REQUIRED = 0x6301;
+
+    private final static byte TEST_ENCRYPTION_INS = 0x50;
 
     private byte[] serial = new byte[]{ 0x30, 0x35, 0x37, 0x36, 0x39, 0x30, 0x31, 0x05 };
     private OwnerPIN pin;
@@ -32,8 +43,15 @@ public class IdentityCard extends Applet
     private static final byte[] timeDelta = new byte[] {0, 0, 0, 0, 5, 38, 92, 0}; //24 hours
     private byte isTimeOK = 0;
     private byte[] timestampExponent = new byte[] {1, 0, 1};
-    private byte[] timestampModulus = new byte[] {0, -116, 35, -92, 85, 71, 55, -43, 71, -69, 111, 122, -103, -61, -6, 95, -29, -126, -91, -79, 0, 61, 42, 27, -88, 38, -91, 23, 42, -116, -60, 118, -111, -3, -120, -8, 116, 10, 92, 75, -82, -81, -2, -111, -24, -59, -18, -47, 61, -71, -89, -96, -109, 76, 84, 57, 87, -89, -32, 124, -74, -41, -74, 19, -3, -122, 20, 27, 115, 57, -123, 2, -15, 39, 97, 51, -1, -15, 123, -9, 127, -93, 85, 107, -26, 71, -67, -29, -86, 35, -18, -105, -109, -41, -40, 11, 28, -49, 85, -76, -10, 5, -105, -22, 22, 4, 59, -7, 23, -110, 12, 19, -114, 107, 48, 66, -32, -45, 2, -105, 78, -67, -51, 87, 3, -29, -101, -36, -29, 2, -14, 47, -69, -95, -113, 7, -14, 107, 66, -81, 69, -80, -63, -37, 36, 88, -110, 91, -31, 91, -33, -19, 125, 65, -36, 55, 41, -48, 9, -31, 36, 66, 100, 10, 45, 55, -114, -60, -51, -13, -79, 3, -31, 114, 17, -7, -6, -82, 100, -79, 119, -27, 80, -80, -109, 38, 48, -101, -28, -47, 57, 106, -5, 103, -35, -72, 126, 101, 98, -33, -1, -65, -112, 106, -84, 83, -18, 99, 84, 107, -83, 100, -62, 11, -46, 73, -41, -17, 73, -28, 86, 12, 20, -61, 120, -51, 84, -21, -89, 51, 98, 60, -73, -65, -100, -88, -98, 72, 5, -115, -80, 123, 53, 32, -78, -49, 33, -27, 0, 78, -104, -110, -57, 9, 90, 2, -97};
+    private byte[] timestampModulus = new byte[] { -96, -90, -100, -32, 75, -91, 47, 44, -118, 34, -110, 90, -63, -43, -113, -116, 10, -9, -69, 42, -13, -25, 67, -22, 85, 114, -25, -3, 72, 63, 115, -105, 65, 82, 121, -49, 26, 21, 44, -108, 33, -110, 51, 37, -50, 32, -40, 0, -66, 113, -37, 65, -85, 48, -46, 1, 102, 14, -99, -57, 20, -2, 71, 49, -8, -63, 20, -87, -11, -117, 89, 41, -120, 5, -72, -70, 86, -4, -80, 48, -52, -30, -111, 85, -81, 85, -43, 67, 93, -15, -40, -21, 46, -84, 24, 4, 10, 105, -82, 30, 7, -21, 43, -121, -11, -66, -110, 122, 1, -83, -79, 4, -49, -5, 88, -56, -56, -10, 45, -113, 57, -15, 23, -30, 103, 53, -41, -29, 121, 45, 47, -71, 39, -71, 99, -81, -79, 39, -104, 62, -114, -28, 13, -97, 51, -128, -13, -100, 54, 125, -31, -5, 80, 81, -20, 66, 118, 110, 75, -29, -33, -97, -28, -40, 41, -114, 58, 47, -75, 89, 87, 62, 27, 3, -1, 58, 47, 59, -36, -34, -51, -111, -87, -58, -47, 119, 47, 40, 78, -99, -11, -5, 104, 1, -11, -95, -32, -96, 21, 9, -1, -21, -58, -123, 105, 119, -77, 45, -121, 117, 110, -42, -101, -43, 87, 60, 119, -53, -49, -92, -52, -101, -95, -94, 97, -11, -120, -50, 118, -3, 105, 96, -44, -54, -96, 122, -125, -94, 33, 27, 71, -81, -5, -114, -62, 93, 85, 109, 121, 55, 81, 38, -119, -82, -94, -9 };
     private RSAPublicKey timestampPublicKey;
+
+    /*
+    *   Transient buffer
+    * */
+    private short currentOffset = 0;
+    private byte[] transientBuffer;
+    private short MAX_BUFFER_SIZE = 1024;
 
     private IdentityCard()
     {
@@ -47,6 +65,8 @@ public class IdentityCard extends Applet
         timestampPublicKey = (RSAPublicKey ) KeyBuilder.buildKey( KeyBuilder.TYPE_RSA_PUBLIC, (short)5, false );
         timestampPublicKey.setExponent( timestampExponent, (short)0, (short) timestampExponent.length );
         timestampPublicKey.setModulus( timestampModulus, (short)0, (short) timestampModulus.length );
+
+        transientBuffer = JCSystem.makeTransientByteArray( MAX_BUFFER_SIZE, JCSystem.CLEAR_ON_RESET );
 
 		/*
 		 * This method registers the applet with the JCRE on the card.
@@ -97,11 +117,26 @@ public class IdentityCard extends Applet
             case GET_SERIAL_INS:
                 getSerial( apdu );
                 break;
-            case UPDATE_TIME_INS:
+            case SHOULD_UPDATE_TIME_INS:
                 shouldUpdateTime( apdu );
+                break;
+            case UPDATE_TIME_INS:
+                updateTime( apdu );
                 break;
             case TEST_SIGNATURE_INS:
                 testSignature( apdu );
+                break;
+            case CLEAR_BUFFER_INS:
+                currentOffset = 0;
+                apdu.setOutgoing();
+                apdu.setOutgoingLength( ( short ) 1 );
+                apdu.sendBytesLong( new byte[]{ 0 }, (short) 0, (short)1 );
+                break;
+            case UPDATE_BUFFER_INS:
+                updateBuffer( apdu );
+                break;
+            case TEST_ENCRYPTION_INS:
+                test( apdu );
                 break;
             //If no matching instructions are found it is indicated in the status word of the response.
             //This can be done by using this method. As an argument a short is given that indicates
@@ -111,35 +146,112 @@ public class IdentityCard extends Applet
         }
     }
 
+    private void updateBuffer( APDU apdu )
+    {
+        byte[] buffer = apdu.getBuffer();
+        short len = (short)(buffer[ISO7816.OFFSET_CDATA] & (short) 0xff);
+
+        if( (short)(len + currentOffset) > MAX_BUFFER_SIZE )
+        {
+            apdu.setOutgoing();
+            apdu.setOutgoingLength( ( short ) 1 );
+            apdu.sendBytesLong( new byte[]{ 0 }, (short) 0, (short)1 );
+
+            return;
+        }
+        Util.arrayCopy( buffer, (short)(ISO7816.OFFSET_CDATA + 1), transientBuffer, currentOffset, len );
+        currentOffset += len;
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength( ( short ) 1 );
+        apdu.sendBytesLong( new byte[]{ 1 }, (short) 0, (short)1 );
+    }
+
     private void shouldUpdateTime( APDU apdu )
     {
         byte[] buffer = apdu.getBuffer();
 
-        byte reqValidation = Util.arrayCompare( DataUtils.add( currentTime, timeDelta ), (short)0, buffer, (short)0, (short)8 );
+        byte reqValidation = Util.arrayCompare( DataUtils.add( currentTime, timeDelta ), (short)0, buffer, (short)ISO7816.OFFSET_CDATA, (short)8 );
 
-        isTimeOK = (byte)(reqValidation == (byte)(-1) ? (byte)1 : (byte)0);
-
-        Util.arrayCopy( buffer, (short)0, currentTime, (short)0, (short)8 );
-
-        // Note(Anton): This changes the buffer so do this after any operation on it
+        isTimeOK = (reqValidation == (byte)(-1) ? (byte)1 : (byte)0);
 
         apdu.setOutgoing();
         apdu.setOutgoingLength( ( short ) 1 );
         apdu.sendBytesLong( new byte[]{ isTimeOK }, (short) 0, (short)1 );
     }
 
-    private void testSignature( APDU apdu )
+    private void updateTime( APDU apdu )
     {
-        byte [] buffer = apdu.getBuffer();
+        if( testSignature( apdu ) != (byte) 1 )
+        {
+            apdu.setOutgoing();
+            apdu.setOutgoingLength( ( short ) 1 );
+            apdu.sendBytesLong( new byte[]{ 1 }, (short) 0, (short)1 );
+
+            return;
+        }
+
+        byte reqValidation = Util.arrayCompare( DataUtils.add( currentTime, timeDelta ), (short)0, transientBuffer, (short)ISO7816.OFFSET_CDATA, (short)8 );
+
+        if( reqValidation >= (byte)0 )
+        {
+            apdu.setOutgoing();
+            apdu.setOutgoingLength( ( short ) 1 );
+            apdu.sendBytesLong( new byte[]{ 2 }, (short) 0, (short)1 );
+
+            return;
+        }
+
+        Util.arrayCopy( transientBuffer, (short)0, currentTime, (short)0, (short)8 );
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength( ( short ) 1 );
+        apdu.sendBytesLong( new byte[]{ 0 }, (short) 0, (short)1 );
+    }
+
+    private void test( APDU apdu )
+    {
+        AESKey aesKey =  (AESKey ) KeyBuilder.buildKey( KeyBuilder.TYPE_AES, (short)128, true );
+        byte[] keyBytes = JCSystem.makeTransientByteArray( (short)16, JCSystem.CLEAR_ON_RESET );
+
+        RandomData rnd = RandomData.getInstance( RandomData.ALG_SECURE_RANDOM );
+        rnd.generateData( keyBytes, (short)0, (short)16 );
+
+        aesKey.setKey( keyBytes, (short)0 );
+
+        Cipher cipher = Cipher.getInstance( Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false );
+
+        cipher.init( aesKey, Cipher.MODE_ENCRYPT );
+
+        byte [] testArray = new byte[16];
+        for( short i = 0; i < (short)16; i++ )
+            testArray[i] = (byte)i;
+
+        byte [] outputArray = JCSystem.makeTransientByteArray( (short)64, JCSystem.CLEAR_ON_RESET );
+
+        cipher.doFinal( testArray, (short)0, (short)16, outputArray, (short)0 );
+
+        byte [] combined = new byte[ keyBytes.length + outputArray.length ];
+
+        Util.arrayCopy( keyBytes, (short)0, combined, (short)0, (short)keyBytes.length );
+        Util.arrayCopy( outputArray, (short)0, combined, (short)keyBytes.length, (short)outputArray.length );
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength( ( short ) combined.length );
+        apdu.sendBytesLong( combined, (short) 0, (short)combined.length );
+    }
+
+    private byte testSignature( APDU apdu )
+    {
+        short len1 = 8;
+        short len2 = 256;
 
         Signature  signature = Signature.getInstance( Signature.ALG_RSA_SHA_PKCS1, false ) ;
 
         signature.init( timestampPublicKey, Signature.MODE_VERIFY );
-        byte isSignatureOK = ( signature.verify( buffer, (short)0, (short)8, buffer, (short)8, (short)16 ) ? (byte)1 : (byte)0);
+        byte isSignatureOK = ( signature.verify( transientBuffer, (short)0, len1, transientBuffer, len1, len2 ) ? (byte)1 : (byte)0);
 
-        apdu.setOutgoing();
-        apdu.setOutgoingLength( ( short ) 1 );
-        apdu.sendBytesLong( new byte[]{ isSignatureOK }, (short) 0, (short)1 );
+        return isSignatureOK;
     }
 
     /*
