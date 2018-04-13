@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.security.*;
 import java.security.cert.CertificateException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.TreeSet;
@@ -52,9 +53,10 @@ public class Main
                 //DataInputStream is = new DataInputStream( c.getInputStream() );
                 ObjectOutputStream os = new ObjectOutputStream( c.getOutputStream() );
 
-                Date date = new Date();
+                Date date = new Date(  );
+                SimpleDateFormat format = new SimpleDateFormat( "yyMMddhhmmss" );
 
-                SignedTimestamp signedTimestamp = new SignedTimestamp( date.getTime(), signature );
+                SignedTimestamp signedTimestamp = new SignedTimestamp( format.format( date ).getBytes(), signature );
 
                 os.writeObject( signedTimestamp );
 

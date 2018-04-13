@@ -8,6 +8,7 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
+import sun.security.x509.X509CertInfo;
 
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
@@ -78,6 +79,16 @@ public class Controller
 
             byte result [] = cipher.doFinal( data, 16, data.length - 16 );
 
+            for( int i = 0; i < result.length; i++ )
+                result[i] += (byte)1;
+
+            Cipher encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
+            encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
+            byte newChallenge[] = encryptCypher.doFinal( result,0, 16 );
+
+            commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, newChallenge, 0, 16 );
+            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
             System.out.println( Arrays.toString( result ) );
         }
         catch ( NoSuchAlgorithmException e )
@@ -118,7 +129,7 @@ public class Controller
         write( new BigInteger( 1, response.getData() ).toString( 16 ) );
 
         SignedTimestamp now  = getTimestampFromRemote();
-        byte[] time = ByteBuffer.allocate( Long.SIZE / Byte.SIZE ).putLong( now.getTimestamp() ).array();
+        byte[] time = now.getTimestamp();
 
         System.out.println( Arrays.toString( time ) );
 
@@ -184,6 +195,8 @@ public class Controller
         }
 
         write( "Buffer ready" );
+
+        X509CertInfo info;
     }
 
 

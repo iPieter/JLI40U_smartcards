@@ -32,6 +32,7 @@ public class IdentityCard extends Applet
     private final static short SW_PIN_VERIFICATION_REQUIRED = 0x6301;
 
     private final static byte TEST_ENCRYPTION_INS = 0x50;
+    private final static byte CONFIRM_CHALLENGE_INS = 0x51;
 
     private byte[] serial = new byte[]{ 0x30, 0x35, 0x37, 0x36, 0x39, 0x30, 0x31, 0x05 };
     private OwnerPIN pin;
@@ -53,6 +54,13 @@ public class IdentityCard extends Applet
     private byte[] transientBuffer;
     private short MAX_BUFFER_SIZE = 1024;
 
+
+    /*
+    *   Symmetric communication
+    * */
+    private AESKey aesKey;
+    byte [] challenge;
+
     private IdentityCard()
     {
         /*
@@ -67,6 +75,11 @@ public class IdentityCard extends Applet
         timestampPublicKey.setModulus( timestampModulus, (short)0, (short) timestampModulus.length );
 
         transientBuffer = JCSystem.makeTransientByteArray( MAX_BUFFER_SIZE, JCSystem.CLEAR_ON_RESET );
+
+        challenge = JCSystem.makeTransientByteArray( (short)16, JCSystem.CLEAR_ON_RESET );
+
+        for( short i = 0; i < (short)16; i++ )
+            challenge[i] = (byte)i;
 
 		/*
 		 * This method registers the applet with the JCRE on the card.
@@ -137,6 +150,9 @@ public class IdentityCard extends Applet
                 break;
             case TEST_ENCRYPTION_INS:
                 test( apdu );
+                break;
+            case CONFIRM_CHALLENGE_INS:
+                confirmChallenge( apdu );
                 break;
             //If no matching instructions are found it is indicated in the status word of the response.
             //This can be done by using this method. As an argument a short is given that indicates
@@ -211,7 +227,7 @@ public class IdentityCard extends Applet
 
     private void test( APDU apdu )
     {
-        AESKey aesKey =  (AESKey ) KeyBuilder.buildKey( KeyBuilder.TYPE_AES, (short)128, true );
+        aesKey =  (AESKey ) KeyBuilder.buildKey( KeyBuilder.TYPE_AES, (short)128, true );
         byte[] keyBytes = JCSystem.makeTransientByteArray( (short)16, JCSystem.CLEAR_ON_RESET );
 
         RandomData rnd = RandomData.getInstance( RandomData.ALG_SECURE_RANDOM );
@@ -223,13 +239,9 @@ public class IdentityCard extends Applet
 
         cipher.init( aesKey, Cipher.MODE_ENCRYPT );
 
-        byte [] testArray = new byte[16];
-        for( short i = 0; i < (short)16; i++ )
-            testArray[i] = (byte)i;
-
         byte [] outputArray = JCSystem.makeTransientByteArray( (short)64, JCSystem.CLEAR_ON_RESET );
 
-        cipher.doFinal( testArray, (short)0, (short)16, outputArray, (short)0 );
+        cipher.doFinal( challenge, (short)0, (short)16, outputArray, (short)0 );
 
         byte [] combined = new byte[ keyBytes.length + outputArray.length ];
 
@@ -239,6 +251,36 @@ public class IdentityCard extends Applet
         apdu.setOutgoing();
         apdu.setOutgoingLength( ( short ) combined.length );
         apdu.sendBytesLong( combined, (short) 0, (short)combined.length );
+    }
+
+    private void encryptKey()
+    {
+        Cipher cipher = Cipher.getInstance( Cipher.ALG_RSA_PKCS1, false );
+
+    }
+
+    private void confirmChallenge( APDU apdu )
+    {
+        byte buffer[] = apdu.getBuffer();
+
+        Cipher cipher = Cipher.getInstance( Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false );
+
+        cipher.init( aesKey, Cipher.MODE_DECRYPT );
+
+        byte[] decrypted = JCSystem.makeTransientByteArray( (short)16, JCSystem.CLEAR_ON_RESET );
+
+        cipher.doFinal( buffer, (short)ISO7816.OFFSET_CDATA, (short)16, decrypted, (short)0 );
+
+        byte isOK = 1;
+        for( short i = 0; i< decrypted.length; i++ )
+        {
+            if( decrypted[i] != (byte)(challenge[i] + (byte)1) )
+                isOK = 0;
+        }
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength( ( short ) 1 );
+        apdu.sendBytesLong( new byte[]{ isOK }, (short) 0, (short)1 );
     }
 
     private byte testSignature( APDU apdu )
