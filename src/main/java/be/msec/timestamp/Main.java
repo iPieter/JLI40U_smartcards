@@ -8,7 +8,6 @@ import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.io.PrintStream;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
