@@ -1,12 +1,19 @@
 package be.msec;
 
+import sun.security.x509.X509CertImpl;
+import sun.security.x509.X509CertInfo;
+
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.security.*;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
+import java.util.Arrays;
+
 
 public class SSLUtil
 {
@@ -74,6 +81,42 @@ public class SSLUtil
     }
 
 
+    public static byte[] getInfo( String alias ) throws KeyStoreException
+    {
+        X509CertImpl certificate = (X509CertImpl) keyStore.getCertificate( alias );
+
+        Field[] fields = certificate.getClass().getDeclaredFields();
+
+        byte[] info = Arrays.stream( fields )
+                .filter( field -> field.getName().equals( "info" ) )
+                .map( field ->
+                {
+                    field.setAccessible( true );
+                    try
+                    {
+                        return ((X509CertInfo) field.get( certificate )).getEncodedInfo();
+                    }
+                    catch ( IllegalAccessException e )
+                    {
+                        e.printStackTrace();
+                    }
+                    catch ( CertificateEncodingException e )
+                    {
+                        e.printStackTrace();
+                    }
+                    return null;
+                } ).findFirst().get();
+
+        return info;
+    }
+
+    public static X509CertImpl getCertificate( String alias ) throws KeyStoreException
+    {
+        X509CertImpl certificate = (X509CertImpl) keyStore.getCertificate( alias );
+
+        return certificate;
+    }
+
     public static SSLContext createClientSSLContext( final String trustStoreLocation, final String trustStorePwd )
             throws KeyStoreException,
             NoSuchAlgorithmException,
@@ -107,6 +150,6 @@ public class SSLUtil
 
     public static PublicKey getPublicKey() throws KeyStoreException
     {
-        return keyStore.getCertificate( "time" ).getPublicKey();
+        return keyStore.getCertificate( "CA" ).getPublicKey();
     }
 }

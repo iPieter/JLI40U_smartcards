@@ -5,10 +5,12 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import sun.security.x509.X509CertImpl;
 
 import java.io.IOException;
 import java.security.*;
 import java.security.cert.CertificateException;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
 
@@ -22,25 +24,36 @@ public class Main extends Application
 
     public static void main( String[] args )
     {
-        boolean PRINT_SHITTY_KEY = false;
+        boolean PRINT_SHITTY_KEY = true;
 
         if( PRINT_SHITTY_KEY )
         {
             try
             {
+                //TODO: this is for anton
                 SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
 
-                RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey();
-                System.out.println( Arrays.toString( key.getPublicExponent().toByteArray() ) );
-                System.out.println( Arrays.toString( key.getModulus().toByteArray() ) );
+                System.out.println("---info---");
+                byte[] info =  SSLUtil.getInfo("time");
+                System.out.println( Arrays.toString( info ) );
+                System.out.println("---signature---");
+                byte[] sign =  SSLUtil.getCertificate("time").getSignature();
+                System.out.println( Arrays.toString(  sign ) );
 
-                System.out.println( key.getModulus().toByteArray().length );
+                //RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey();
+                //System.out.println( Arrays.toString( key.getPublicExponent().toByteArray() ) );
+                //System.out.println( Arrays.toString( key.getModulus().toByteArray() ) );
 
-                //RSAPrivateKey privateKey = (RSAPrivateKey) keyStore.getKey( "time", "password".toCharArray() );
+                //System.out.println( key.getModulus().toByteArray().length );
 
-                //Signature signature = Signature.getInstance( "SHA1withRSA" );
-                //signature.initSign( privateKey );
-                //signature.update( new byte[]{0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04} );
+                SSLUtil.createKeyStore( "CA.jks", "password" );
+
+                PublicKey publicKey = SSLUtil.getPublicKey();
+
+                Signature signature = Signature.getInstance( "SHA1withRSA" );
+                signature.initVerify( publicKey );
+                signature.update( info );
+                System.out.println(signature.verify( sign ));
                 //System.out.println( Arrays.toString( signature.sign() ) );
                 //System.out.println( signature.sign().length );
             }
@@ -57,6 +70,14 @@ public class Main extends Application
                 e.printStackTrace();
             }
             catch ( NoSuchAlgorithmException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( SignatureException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( InvalidKeyException e )
             {
                 e.printStackTrace();
             }
