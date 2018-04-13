@@ -97,32 +97,81 @@ public class Main extends Application
 
     }
 
-    public static byte[] getPublicKey(byte[] input, short length)
+    public static byte[] getPublicKey( byte[] input, short length )
     {
         byte[] output = new byte[length];
 
         for (short i = 0; i < length; i++)
         {
-            output[i] = input[input.length - length + i ];
+            output[i] = input[input.length - length + i];
         }
 
         return output;
     }
 
-    public static byte[] getSubjectName(byte[] input, short keyLength)
+    public static byte[] getSubjectName( byte[] input, short keyLength )
     {
         short count = 0;
         short start = (short) (input.length - keyLength);
-        while (count++ != input[--start]);
+        while ( count++ != input[--start] ) ;
         byte[] output = new byte[count - 1];
         for (short i = 0; i < count - 1; i++)
         {
-            output[i] = input[ start + i + 1];
+            output[i] = input[start + i + 1];
         }
 
         return output;
     }
 
+
+    public static byte[] getValidAfterTime( byte[] input )
+    {
+        short start = 40; //second value
+        while ( 48 != input[start++] || 13 != input[start + 2] );
+
+        byte[] output = new byte[12];
+        for (short i = 0; i < 12; i++)
+        {
+            output[i] = input[start + i + 3];
+        }
+
+        return output;
+    }
+
+    public static byte[] getValidBeforeTime( byte[] input )
+    {
+        short start = 60; //second value
+        while ( 48 != input[start++] || 13 != input[start + 4] );
+
+        byte[] output = new byte[12];
+        for (short i = 0; i < 12; i++)
+        {
+            output[i] = input[start + i + 5];
+        }
+
+        return output;
+    }
+
+    public static boolean compareTime( byte[] start, byte[] now, byte[] end )
+    {
+        boolean beforeOk = false;
+        boolean afterOk = false;
+
+       for (short i = 0; i < 12; i++)
+       {
+           beforeOk = beforeOk || start[i] < now[i];
+           afterOk = afterOk || end[i] > now[i];
+           if ( beforeOk && afterOk )
+           {
+               return true;
+           } else if (start[i] > now[i] || end[i] < now[i])
+           {
+               return false;
+           }
+       }
+
+       return false;
+    }
 
     @Override
     public void start( Stage stage ) throws Exception
