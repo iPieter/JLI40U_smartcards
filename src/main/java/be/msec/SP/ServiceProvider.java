@@ -12,9 +12,12 @@ import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Signature;
-import java.util.Arrays;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -64,8 +67,9 @@ public class ServiceProvider
                         throws IOException
                 {
                     String message = new String( body, "UTF-8" );
-                    System.out.println( " [x] Received '" + message + "'" );
-
+                    System.out.println( " [x] Received '" + message + "', sending certificate" );
+                    sendCertificate( message );
+                    channel.basicAck( envelope.getDeliveryTag(), true );
                 }
             };
 
@@ -96,7 +100,7 @@ public class ServiceProvider
 
             SSLServerSocketFactory ssf = context.getServerSocketFactory();
             SSLServerSocket        s   = (SSLServerSocket) ssf.createServerSocket( 1271 );
-            Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
+            //Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
             while ( true )
             {
@@ -119,6 +123,39 @@ public class ServiceProvider
             e.printStackTrace();
         }
     }
+
+    private void sendCertificate( String identifier )
+    {
+//start ssl server with root keys, because
+        try
+        {
+            SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
+            Certificate certificate = SSLUtil.getCertificate( identifier.toLowerCase() );
+
+            os.writeObject( certificate );
+            System.out.println("sending " + certificate.toString());
+        }
+        catch ( KeyStoreException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( IOException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( CertificateException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( NoSuchAlgorithmException e )
+        {
+            e.printStackTrace();
+        }
+
+
+
+    }
+
 
     private void close()
     {

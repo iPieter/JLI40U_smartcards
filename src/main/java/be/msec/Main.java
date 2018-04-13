@@ -1,38 +1,19 @@
 package be.msec;
 
-import be.msec.smartcard.HelloWorldApplet;
-import be.msec.smartcard.IdentityCard;
-import com.licel.jcardsim.base.Simulator;
-import javacard.framework.AID;
-import javacard.framework.Util;
+import be.msec.SP.Card;
 import javafx.application.Application;
-import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 
-import javax.smartcardio.CommandAPDU;
-import javax.smartcardio.ResponseAPDU;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.math.BigInteger;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.*;
-import java.security.cert.CertificateException;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.Random;
-
-import javax.net.ssl.*;
-import java.io.*;
-import java.security.*;
-import java.security.cert.CertificateException;
+import java.security.cert.*;
+import java.security.cert.Certificate;
 import java.util.Arrays;
 
 /**
@@ -62,13 +43,18 @@ public class Main extends Application
                 //socket.setEnabledCipherSuites( enabledCipherSuites );
 
                 //Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
-                //ObjectInputStream inputStream = new ObjectInputStream( socket.getInputStream() );
+
                 ObjectOutputStream os = new ObjectOutputStream( socket.getOutputStream() );
+                ObjectInputStream  is = new ObjectInputStream( socket.getInputStream() );
 
                 os.writeObject( new Card( "bob" ) );
                 System.out.println("wrote card to ssl stream");
+
+                Certificate certificate = (Certificate) is.readObject();
+
+                System.out.println(certificate.toString());
                 os.close();
-                //inputStream.close();
+                is.close();
                 socket.close();
 
                 SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
@@ -128,6 +114,14 @@ public class Main extends Application
                 e.printStackTrace();
             }
             catch ( InvalidKeyException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( KeyManagementException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( ClassNotFoundException e )
             {
                 e.printStackTrace();
             }
