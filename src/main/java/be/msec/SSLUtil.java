@@ -105,6 +105,20 @@ public class SSLUtil
         return key;
     }
 
+    public static PublicKey getPublicKey(String alias) throws KeyStoreException
+    {
+        return keyStore.getCertificate( alias ).getPublicKey();
+    }
+
+    public static Key getPrivateKey(String alias) throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException
+    {
+        assert keyStore != null;
+
+        Key key = keyStore.getKey( alias, "password".toCharArray() );
+
+        return key;
+    }
+
     public static PublicKey getPublicKey() throws KeyStoreException
     {
         return keyStore.getCertificate( "time" ).getPublicKey();

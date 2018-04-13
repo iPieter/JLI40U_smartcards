@@ -4,6 +4,7 @@ var app = new Vue({
         cards: {},
         connected: false,
         ip: "127.0.0.1:15674",
+        spValue: 'GOV1',
     },
     methods: {
         reconnect: function (event) {
@@ -14,6 +15,10 @@ var app = new Vue({
             if (!client.connected) {
                 client.connect('guest', 'guest', on_connect, on_error, '/');
             }
+        },
+        setSP: function (data) {
+            client.send("sp", null, data);
+            app.spValue = data;
         }
     }
 });
@@ -26,7 +31,7 @@ var on_connect = function () {
 
     app.connected = true;
 
-    cards = subscribeToQueue("/exchange/amq.topic/card", app.cards  );
+    cards = subscribeToQueue("/exchange/amq.topic/card", app.cards);
     //symptoms = subscribeToQueueWithoutFilter( "/exchange/stats/symptom.*", app.symptoms);
     //diagnoses = subscribeToQueueWithoutFilter( "/exchange/stats/diagnosis.*", app.diagnoses);
 };

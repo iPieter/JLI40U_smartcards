@@ -1,5 +1,6 @@
 package be.msec;
 
+import be.msec.SP.Card;
 import be.msec.smartcard.HelloWorldApplet;
 import be.msec.smartcard.IdentityCard;
 import com.licel.jcardsim.base.Simulator;
@@ -58,17 +59,17 @@ public class Main extends Application
             {
                 SSLContext context = SSLUtil.createClientSSLContext( "CA.jks", "password" );
 
-                socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1207 );
+                socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1271 );
                 //socket.setEnabledCipherSuites( enabledCipherSuites );
 
-                Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
-                ObjectInputStream inputStream = new ObjectInputStream( socket.getInputStream() );
+                //Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
+                //ObjectInputStream inputStream = new ObjectInputStream( socket.getInputStream() );
+                ObjectOutputStream os = new ObjectOutputStream( socket.getOutputStream() );
 
-                System.out.println(inputStream.readObject());
-
-
-
-                inputStream.close();
+                os.writeObject( new Card( "bob" ) );
+                System.out.println("wrote card to ssl stream");
+                os.close();
+                //inputStream.close();
                 socket.close();
 
                 SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
@@ -100,10 +101,6 @@ public class Main extends Application
                 e.printStackTrace();
             }
             catch ( NoSuchAlgorithmException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( ClassNotFoundException e )
             {
                 e.printStackTrace();
             }

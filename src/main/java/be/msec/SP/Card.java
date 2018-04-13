@@ -6,11 +6,13 @@ import org.nd4j.shade.jackson.core.JsonProcessingException;
 import org.nd4j.shade.jackson.databind.ObjectMapper;
 import org.nd4j.shade.jackson.databind.ObjectWriter;
 
+import java.io.Serializable;
+
 /**
  * @author Pieter
  * @version 1.0
  */
-public class Card
+public class Card implements Serializable
 {
     private String key;
 
