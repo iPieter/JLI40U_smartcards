@@ -312,7 +312,7 @@ public class IdentityCard extends Applet
             return;
         }
 
-        byte reqValidation = Util.arrayCompare( currentTime, (short)0, transientInBuffer, (short)ISO7816.OFFSET_CDATA, (short)24 );
+        byte reqValidation = Util.arrayCompare( currentTime, (short)0, transientInBuffer, (short)0, (short)12 );
 
         if( reqValidation >= (byte)0 )
         {
