@@ -12,6 +12,7 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.TreeSet;
 
@@ -29,21 +30,13 @@ public class Main
             SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
             SSLContext context = SSLUtil.createServerSSLContext();
 
-            TreeSet <String> algorithms = new TreeSet <>();
-            for (Provider provider : Security.getProviders())
-                for (Provider.Service service : provider.getServices())
-                    if ( service.getType().equals( "Signature" ) )
-                        algorithms.add( service.getAlgorithm() );
-            for (String algorithm : algorithms)
-                System.out.println( algorithm );
-
             //init signing
             Signature signature = Signature.getInstance( "SHA1withRSA" );
             signature.initSign( (PrivateKey) SSLUtil.getPrivateKey() );
 
             SSLServerSocketFactory ssf = context.getServerSocketFactory();
             SSLServerSocket        s   = (SSLServerSocket) ssf.createServerSocket( 1207 );
-            Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
+            //Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
             while ( true )
             {
@@ -53,10 +46,14 @@ public class Main
                 //DataInputStream is = new DataInputStream( c.getInputStream() );
                 ObjectOutputStream os = new ObjectOutputStream( c.getOutputStream() );
 
-                Date date = new Date(  );
+                Date             date   = new Date();
                 SimpleDateFormat format = new SimpleDateFormat( "yyMMddhhmmss" );
 
-                SignedTimestamp signedTimestamp = new SignedTimestamp( format.format( date ).getBytes(), signature );
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime( date );
+                calendar.add( Calendar.DATE, 1 );  // number of days to add
+
+                SignedTimestamp signedTimestamp = new SignedTimestamp( format.format( date ).getBytes(), signature, format.format( calendar.getTime() ).getBytes() );
 
                 os.writeObject( signedTimestamp );
 
