@@ -26,7 +26,7 @@ public class IdentityCard extends Applet
     private final static short SW_VERIFICATION_FAILED       = 0x6300;
     private final static short SW_PIN_VERIFICATION_REQUIRED = 0x6301;
 
-    private final static byte TEST_ENCRYPTION_INS = 0x50;
+    private final static byte AUTHENTICATE_SP_INS   = 0x50;
     private final static byte CONFIRM_CHALLENGE_INS = 0x51;
 
     private byte[] serial = new byte[]{ 0x30, 0x35, 0x37, 0x36, 0x39, 0x30, 0x31, 0x05 };
@@ -166,8 +166,8 @@ public class IdentityCard extends Applet
             case GET_OUTPUT_BUFFER_INS:
                 getOutputBufferChunk( apdu );
                 break;
-            case TEST_ENCRYPTION_INS:
-                test( apdu );
+            case AUTHENTICATE_SP_INS:
+                authenticateSP( apdu );
                 break;
             case CONFIRM_CHALLENGE_INS:
                 confirmChallenge( apdu );
@@ -292,7 +292,7 @@ public class IdentityCard extends Applet
     {
         byte[] buffer = apdu.getBuffer();
 
-        byte reqValidation = Util.arrayCompare( currentTime, (short)0, buffer, (short)ISO7816.OFFSET_CDATA, (short)12 ); //TODO: add delta
+        byte reqValidation = Util.arrayCompare( validationTime, (short)0, buffer, (short)ISO7816.OFFSET_CDATA, (short)12 ); //TODO: add delta
 
         isTimeOK = (reqValidation == (byte)(-1) ? (byte)1 : (byte)0);
 
@@ -338,7 +338,7 @@ public class IdentityCard extends Applet
         return (short)((short)((transientInBuffer[1] & 0xff) << 8) | ((short)transientInBuffer[0] & 0xff));
     }
 
-    private void test( APDU apdu )
+    private void authenticateSP( APDU apdu )
     {
         byte[] n = getSubjectName( transientInBuffer, (short)256 );
 
@@ -401,12 +401,6 @@ public class IdentityCard extends Applet
         apdu.setOutgoing();
         apdu.setOutgoingLength( ( short ) 1 );
         apdu.sendBytesLong( new byte[]{ 0 }, (short) 0, (short)1 );
-    }
-
-    private void encryptKey()
-    {
-        Cipher cipher = Cipher.getInstance( Cipher.ALG_RSA_PKCS1, false );
-
     }
 
     private void confirmChallenge( APDU apdu )
