@@ -36,6 +36,7 @@ public class IdentityCard extends Applet
      *  TimeStamp:
      * */
     private byte[] currentTime = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    private byte[] validationTime = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     private static final byte[] timeDelta = new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 5, 38, 92, 0}; //24 hours
     private byte isTimeOK = 0;
     private byte[] timestampExponent = new byte[] {1, 0, 1};
@@ -302,7 +303,7 @@ public class IdentityCard extends Applet
 
     private void updateTime( APDU apdu )
     {
-        if( testSignature( apdu, timestampPublicKey, (short)0, (short)12, (short)256 ) != (byte) 1 )
+        if( testSignature( apdu, timestampPublicKey, (short)0, (short)24, (short)256 ) != (byte) 1 )
         {
             apdu.setOutgoing();
             apdu.setOutgoingLength( ( short ) 1 );
@@ -311,7 +312,7 @@ public class IdentityCard extends Applet
             return;
         }
 
-        byte reqValidation = Util.arrayCompare( currentTime, (short)0, transientInBuffer, (short)ISO7816.OFFSET_CDATA, (short)12 );
+        byte reqValidation = Util.arrayCompare( currentTime, (short)0, transientInBuffer, (short)ISO7816.OFFSET_CDATA, (short)24 );
 
         if( reqValidation >= (byte)0 )
         {
@@ -323,11 +324,14 @@ public class IdentityCard extends Applet
         }
 
         Util.arrayCopy( transientInBuffer, (short)0, currentTime, (short)0, (short)12 );
+        Util.arrayCopy( transientInBuffer, (short)12, validationTime, (short)0, (short)12 );
 
         apdu.setOutgoing();
         apdu.setOutgoingLength( ( short ) 1 );
         apdu.sendBytesLong( new byte[]{ 0 }, (short) 0, (short)1 );
     }
+
+
 
     private short getEncodedSize()
     {

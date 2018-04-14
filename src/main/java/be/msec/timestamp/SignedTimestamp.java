@@ -1,7 +1,6 @@
 package be.msec.timestamp;
 
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.util.Arrays;
@@ -15,18 +14,27 @@ public class SignedTimestamp implements Serializable
     private byte[] timestamp;
     private byte[] signature;
 
-    public SignedTimestamp( byte[] timestamp, byte[] signature )
+    public SignedTimestamp( byte[] timestamp, byte[] validationTime )
     {
-        this.timestamp = timestamp;
-        this.signature = signature;
+        this.timestamp = new byte[timestamp.length + validationTime.length];
+
+        for (int i = 0; i < timestamp.length; i++)
+            this.timestamp[i] = timestamp[i];
+
+        for (int i = 0; i < validationTime.length; i++)
+            this.timestamp[timestamp.length + i] = validationTime[i];
+
     }
 
-    public SignedTimestamp( byte[] timestamp, Signature s ) throws SignatureException
+    public SignedTimestamp( byte[] timestamp, Signature s, byte[] validationTime ) throws SignatureException
     {
-        this.timestamp = timestamp;
-        s.update( timestamp );
+        this(timestamp, validationTime);
+
+        s.update( this.timestamp );
+
         this.signature = s.sign();
     }
+
 
     public boolean validate( Signature s ) throws SignatureException
     {
