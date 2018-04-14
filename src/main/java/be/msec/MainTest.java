@@ -1,13 +1,9 @@
 package be.msec;
 
+/*
 import org.junit.Test;
-
 import static org.junit.Assert.*;
 
-/**
- * @author Pieter
- * @version 1.0
- */
 public class MainTest
 {
     @Test
@@ -71,3 +67,4 @@ public class MainTest
     }
 
 }
+*/

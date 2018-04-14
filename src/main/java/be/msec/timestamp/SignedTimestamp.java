@@ -1,9 +1,9 @@
 package be.msec.timestamp;
 
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.util.Arrays;
 
 /**
  * @author Pieter
@@ -11,29 +11,38 @@ import java.security.SignatureException;
  */
 public class SignedTimestamp implements Serializable
 {
-    private long   timestamp;
+    private byte[] timestamp;
     private byte[] signature;
 
-    public SignedTimestamp( long timestamp, byte[] signature )
+    public SignedTimestamp( byte[] timestamp, byte[] validationTime )
     {
-        this.timestamp = timestamp;
-        this.signature = signature;
+        this.timestamp = new byte[timestamp.length + validationTime.length];
+
+        for (int i = 0; i < timestamp.length; i++)
+            this.timestamp[i] = timestamp[i];
+
+        for (int i = 0; i < validationTime.length; i++)
+            this.timestamp[timestamp.length + i] = validationTime[i];
+
     }
 
-    public SignedTimestamp( Long timestamp, Signature s ) throws SignatureException
+    public SignedTimestamp( byte[] timestamp, Signature s, byte[] validationTime ) throws SignatureException
     {
-        this.timestamp = timestamp;
-        s.update( ByteBuffer.allocate( Long.SIZE / Byte.SIZE ).putLong( timestamp ).array() );
+        this(timestamp, validationTime);
+
+        s.update( this.timestamp );
+
         this.signature = s.sign();
     }
 
+
     public boolean validate( Signature s ) throws SignatureException
     {
-        s.update( ByteBuffer.allocate( Long.SIZE / Byte.SIZE ).putLong( timestamp ).array() );
+        s.update( timestamp );
         return s.verify( signature );
     }
 
-    public long getTimestamp()
+    public byte[] getTimestamp()
     {
         return timestamp;
     }
@@ -47,7 +56,7 @@ public class SignedTimestamp implements Serializable
     public String toString()
     {
         return "SignedTimestamp{" +
-                "timestamp=" + timestamp +
+                "timestamp=" + Arrays.toString( timestamp ) +
                 '}';
     }
 }
