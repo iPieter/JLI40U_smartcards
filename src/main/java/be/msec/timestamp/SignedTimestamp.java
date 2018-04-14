@@ -13,26 +13,28 @@ public class SignedTimestamp implements Serializable
 {
     private byte[] timestamp;
     private byte[] signature;
-    private byte[] validationTime;
-    private byte[] validationSignature;
 
-    public SignedTimestamp( byte[] timestamp, byte[] signature, byte[] validationTime, byte[] validationSignature )
+    public SignedTimestamp( byte[] timestamp, byte[] validationTime )
     {
-        this.timestamp = timestamp;
-        this.signature = signature;
-        this.validationTime = validationTime;
-        this.validationSignature = validationSignature;
+        this.timestamp = new byte[timestamp.length + validationTime.length];
+
+        for (int i = 0; i < timestamp.length; i++)
+            this.timestamp[i] = timestamp[i];
+
+        for (int i = 0; i < validationTime.length; i++)
+            this.timestamp[timestamp.length + i] = validationTime[i];
+
     }
 
     public SignedTimestamp( byte[] timestamp, Signature s, byte[] validationTime ) throws SignatureException
     {
-        this.timestamp = timestamp;
-        s.update( timestamp );
+        this(timestamp, validationTime);
+
+        s.update( this.timestamp );
+
         this.signature = s.sign();
-        this.validationTime = validationTime;
-        s.update( validationTime );
-        this.validationSignature = s.sign();
     }
+
 
     public boolean validate( Signature s ) throws SignatureException
     {
@@ -48,16 +50,6 @@ public class SignedTimestamp implements Serializable
     public byte[] getSignature()
     {
         return signature;
-    }
-
-    public byte[] getValidationTime()
-    {
-        return validationTime;
-    }
-
-    public byte[] getValidationSignature()
-    {
-        return validationSignature;
     }
 
     @Override
