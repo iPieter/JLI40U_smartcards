@@ -196,7 +196,7 @@ public class IdentityCard extends Applet
 
         for (short i = 0; i < length; i++)
         {
-            output[i] = input[getEncodedSize() - length - 5 + i]; //TODO: remove hardcoded shit
+            output[i] = input[getEncodedSize() - length - 5 + 2 + i]; //TODO: remove hardcoded shit
         }
 
         return output;
@@ -205,7 +205,7 @@ public class IdentityCard extends Applet
     public byte[] getSubjectName( byte[] input, short keyLength )
     {
         short count = 0;
-        short start = (short) (getEncodedSize() + 256 - keyLength);
+        short start = (short) (getEncodedSize() - 256 - 5 + 2 );
         while ( count++ != input[--start] ) ;
         byte[] output = new byte[count - 1];
         for (short i = 0; i < count - 1; i++)
@@ -336,6 +336,8 @@ public class IdentityCard extends Applet
 
     private void test( APDU apdu )
     {
+        byte[] n = getSubjectName( transientInBuffer, (short)256 );
+
         byte isSignatureOK = testSignature( apdu, caPublicKey, (short)2, getEncodedSize(), (short)256 );
 
         if( isSignatureOK != 1 )
@@ -432,7 +434,7 @@ public class IdentityCard extends Applet
         Signature  signature = Signature.getInstance( Signature.ALG_RSA_SHA_PKCS1, false ) ;
 
         signature.init( key, Signature.MODE_VERIFY );
-        byte isSignatureOK = ( signature.verify( transientInBuffer, off, len1, transientInBuffer, len1, len2 ) ? (byte)1 : (byte)0);
+        byte isSignatureOK = ( signature.verify( transientInBuffer, off, len1, transientInBuffer, (short ) (len1 + off), len2 ) ? (byte)1 : (byte)0);
 
         return isSignatureOK;
     }

@@ -115,57 +115,19 @@ public class Controller
             rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
 
             RSAPublicKey publicKey = (RSAPublicKey ) SSLUtil.getPublicKey( "TIME" );
-
-            byte[] mod1 = publicKey.getModulus().toByteArray();
-            byte[] mod =  privateKey.getModulus().toByteArray();
+            byte[] mod = publicKey.getModulus().toByteArray();
 
             byte[] symmKey =  rsaCipher.doFinal( responseBuffer, 0, 256 );
 
             System.out.println( Arrays.toString( symmKey ) );
-        }
-        catch ( NoSuchAlgorithmException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( NoSuchPaddingException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( UnrecoverableKeyException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( KeyStoreException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( InvalidKeyException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( BadPaddingException e )
-        {
-            e.printStackTrace();
-            System.out.println( e.getLocalizedMessage());
-            System.out.println( e.getMessage());
-        }
-        catch ( IllegalBlockSizeException e )
-        {
-            e.printStackTrace();
-        }
 
-        byte[] data = response.getData();
-
-        SecretKey key = new SecretKeySpec( data, 0,16,  "AES" );
-        byte[] ivdata = new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        IvParameterSpec spec = new IvParameterSpec( ivdata );
-
-        try
-        {
+            SecretKey key = new SecretKeySpec( symmKey, 0,16,  "AES" );
+            byte[] ivdata = new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            IvParameterSpec spec = new IvParameterSpec( ivdata );
             Cipher cipher = Cipher.getInstance( "AES/CBC/NoPadding" );
             cipher.init( Cipher.DECRYPT_MODE, key, spec );
 
-            byte result [] = cipher.doFinal( data, 16, data.length - 16 );
+            byte result [] = cipher.doFinal( responseBuffer, 256, 32 );
 
             for( int i = 0; i < result.length; i++ )
                 result[i] += (byte)1;
@@ -178,28 +140,9 @@ public class Controller
             response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
             System.out.println( Arrays.toString( result ) );
+            System.out.println( Arrays.toString( response.getData() ) );
         }
-        catch ( NoSuchAlgorithmException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( NoSuchPaddingException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( InvalidKeyException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( BadPaddingException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( IllegalBlockSizeException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( InvalidAlgorithmParameterException e )
+        catch ( Exception e )
         {
             e.printStackTrace();
         }

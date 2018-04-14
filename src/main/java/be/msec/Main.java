@@ -30,16 +30,16 @@ public class Main extends Application
             try
             {
                 //TODO: this is for anton
-                SSLUtil.createKeyStore( "CA.jks", "password" );
+                SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
 
 
-                RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey( "CA" );
+                RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey( "TIME" );
                 System.out.println( Arrays.toString( key.getPublicExponent().toByteArray() ) );
                 System.out.println( Arrays.toString( key.getModulus().toByteArray() ) );
 
                 System.out.println( key.getModulus().toByteArray().length );
 
-                /*
+
                 System.out.println( "---info---" );
                 byte[] info = SSLUtil.getInfo( "time" );
                 System.out.println( Arrays.toString( info ) );
@@ -56,15 +56,7 @@ public class Main extends Application
                 System.out.println( Arrays.toString( "20180513090056".getBytes() ) );
                 System.out.println( Arrays.toString( ByteBuffer.allocate( Long.SIZE / Byte.SIZE ).putLong( 1526202056000L ).array() ) );
 
-                SSLUtil.createKeyStore( "CA.jks", "password" );
 
-                PublicKey publicKey = SSLUtil.getPublicKey();
-
-                Signature signature = Signature.getInstance( "SHA1withRSA" );
-                signature.initVerify( publicKey );
-                signature.update( info );
-                System.out.println( signature.verify( sign ) );
-                */
                 //System.out.println( Arrays.toString( signature.sign() ) );
                 //System.out.println( signature.sign().length );
             }
