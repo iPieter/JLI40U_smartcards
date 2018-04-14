@@ -148,8 +148,8 @@ public class SSLUtil
         return key;
     }
 
-    public static PublicKey getPublicKey() throws KeyStoreException
+    public static PublicKey getPublicKey( String caName ) throws KeyStoreException
     {
-        return keyStore.getCertificate( "CA" ).getPublicKey();
+        return keyStore.getCertificate(caName).getPublicKey();
     }
 }
