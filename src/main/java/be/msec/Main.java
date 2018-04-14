@@ -1,16 +1,17 @@
 package be.msec;
 
+import be.msec.SP.Card;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
-import java.io.IOException;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.*;
-import java.security.cert.CertificateException;
-import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
 
 /**
@@ -19,6 +20,11 @@ import java.util.Arrays;
  */
 public class Main extends Application
 {
+    private static SSLSocket        socket    = null;
+    private static Thread           thread    = null;
+    private static DataInputStream  console   = null;
+    private static DataOutputStream streamOut = null;
+
     private static final char[] passphrase = "password".toCharArray();
 
     public static void main( String[] args )
@@ -29,7 +35,26 @@ public class Main extends Application
         {
             try
             {
-                //TODO: this is for anton
+                SSLContext context = SSLUtil.createClientSSLContext( "CA.jks", "password" );
+
+                socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1271 );
+                //socket.setEnabledCipherSuites( enabledCipherSuites );
+
+                //Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
+
+                ObjectOutputStream os = new ObjectOutputStream( socket.getOutputStream() );
+                ObjectInputStream  is = new ObjectInputStream( socket.getInputStream() );
+
+                os.writeObject( new Card( "bob" ) );
+                System.out.println("wrote card to ssl stream");
+
+                Certificate certificate = (Certificate) is.readObject();
+
+                System.out.println(certificate.toString());
+                os.close();
+                is.close();
+                socket.close();
+
                 SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
 
 
@@ -61,6 +86,14 @@ public class Main extends Application
                 //System.out.println( signature.sign().length );
             }
             catch ( Exception e )
+            {
+                e.printStackTrace();
+            }
+            catch ( KeyManagementException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( ClassNotFoundException e )
             {
                 e.printStackTrace();
             }
