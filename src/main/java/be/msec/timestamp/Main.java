@@ -32,7 +32,7 @@ public class Main
 
             //init signing
             Signature signature = Signature.getInstance( "SHA1withRSA" );
-            signature.initSign( (PrivateKey) SSLUtil.getPrivateKey() );
+            signature.initSign( (PrivateKey) SSLUtil.getPrivateKey("TIME") );
 
             SSLServerSocketFactory ssf = context.getServerSocketFactory();
             SSLServerSocket        s   = (SSLServerSocket) ssf.createServerSocket( 1207 );

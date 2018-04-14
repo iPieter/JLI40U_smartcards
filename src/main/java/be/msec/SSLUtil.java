@@ -139,11 +139,11 @@ public class SSLUtil
 
     }
 
-    public static Key getPrivateKey() throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException
+    public static Key getPrivateKey( String name ) throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException
     {
         assert keyStore != null;
 
-        Key key = keyStore.getKey( "time", "password".toCharArray() );
+        Key key = keyStore.getKey( name, "password".toCharArray() );
 
         return key;
     }

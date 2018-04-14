@@ -63,16 +63,43 @@ public class Controller
         CommandAPDU  commandAPDU;
         ResponseAPDU response;
 
+        SignedTimestamp now  = getTimestampFromRemote();
+        byte[] time = now.getTimestamp();
+
+        write( "Time from server: " +  Arrays.toString( time ) );
+
+        write( "Testing time" );
+
+        commandAPDU = new CommandAPDU( 0x80, 0x26, 0x00, 0x00, time );
+        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+        write( "Time needs update = " + Arrays.toString( response.getData() ) );
+
+        byte [] buffer = new byte[ time.length + now.getSignature().length ];
+        for(int i = 0; i < time.length; i++ )
+            buffer[i] = time[i];
+        for(int i = 0; i < now.getSignature().length; i++ )
+            buffer[i + time.length] = now.getSignature()[i];
+
+        updateTransientBuffer( buffer );
+
+        write( "Updating and verifying signed timestamp" );
+
+        commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00  );
+        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+        write( "Correct signature: " + (response.getData()[0] == 0) + " statuscode:" + response.getData()[0] );
+
         write( "Uploading certificate" );
 
         try
         {
-            SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
-            X509CertImpl cert =  SSLUtil.getCertificate( "TIME" );
+            SSLUtil.createKeyStore( "GOV1_keys.jks", "password" );
+            X509CertImpl cert =  SSLUtil.getCertificate( "GOV1" );
             byte[] signature = cert.getSignature();
-            byte[] certEncoded = SSLUtil.getInfo( "TIME" );
+            byte[] certEncoded = SSLUtil.getInfo( "GOV1" );
 
-            byte[] buffer = new byte[ signature.length + certEncoded.length + 2 ];
+            buffer = new byte[ signature.length + certEncoded.length + 2 ];
 
             buffer[0] = (byte)(certEncoded.length & 0xFF );
             buffer[1] = (byte)((certEncoded.length >> 8) & 0xFF );
@@ -111,11 +138,8 @@ public class Controller
         {
 
             Cipher rsaCipher = Cipher.getInstance( "RSA/ECB/PKCS1PADDING" );
-            RSAPrivateKey privateKey = (RSAPrivateKey ) SSLUtil.getPrivateKey();
+            RSAPrivateKey privateKey = (RSAPrivateKey ) SSLUtil.getPrivateKey( "GOV1" );
             rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
-
-            RSAPublicKey publicKey = (RSAPublicKey ) SSLUtil.getPublicKey( "TIME" );
-            byte[] mod = publicKey.getModulus().toByteArray();
 
             byte[] symmKey =  rsaCipher.doFinal( responseBuffer, 0, 256 );
 
@@ -139,6 +163,7 @@ public class Controller
             commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, newChallenge, 0, 16 );
             response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
+            write( Arrays.toString( result ) );
             System.out.println( Arrays.toString( result ) );
             System.out.println( Arrays.toString( response.getData() ) );
         }
@@ -160,33 +185,6 @@ public class Controller
 
         write( new BigInteger( 1, response.getData() ).toString( 16 ) );
         */
-
-        SignedTimestamp now  = getTimestampFromRemote();
-        byte[] time = now.getTimestamp();
-
-        write( "Time from server: " +  Arrays.toString( time ) );
-
-        write( "Testing time" );
-
-        commandAPDU = new CommandAPDU( 0x80, 0x26, 0x00, 0x00, time );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
-
-        write( "Time needs update = " + Arrays.toString( response.getData() ) );
-
-        byte [] buffer = new byte[ time.length + now.getSignature().length ];
-        for(int i = 0; i < time.length; i++ )
-            buffer[i] = time[i];
-        for(int i = 0; i < now.getSignature().length; i++ )
-            buffer[i + time.length] = now.getSignature()[i];
-
-        updateTransientBuffer( buffer );
-
-        write( "Updating and verifying signed timestamp" );
-
-        commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00  );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
-
-        write( "Correct signature: " + (response.getData()[0] == 0) + " statuscode:" + response.getData()[0] );
 
     }
 
