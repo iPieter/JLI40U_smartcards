@@ -50,7 +50,9 @@ public class Controller
 
         CommandAPDU  commandAPDU;
         ResponseAPDU response;
+        byte [] buffer;
 
+        /*
         SignedTimestamp now  = getTimestampFromRemote();
         byte[]          time = now.getTimestamp();
 
@@ -63,43 +65,63 @@ public class Controller
 
         write( "Time needs update = " + Arrays.toString( response.getData() ) );
 
-        byte[] buffer = new byte[time.length + now.getSignature().length];
-        for (int i = 0; i < time.length; i++)
+        buffer = new byte[ time.length + now.getSignature().length ];
+        for(int i = 0; i < time.length; i++ )
             buffer[i] = time[i];
-        for (int i = 0; i < now.getSignature().length; i++)
+        for(int i = 0; i < now.getSignature().length; i++ )
             buffer[i + time.length] = now.getSignature()[i];
 
         updateTransientBuffer( buffer );
 
         write( "Updating and verifying signed timestamp" );
 
-        commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00 );
+        commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00  );
         response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
         write( "Correct signature: " + (response.getData()[0] == 0) + " statuscode:" + response.getData()[0] );
+        */
 
         write( "Uploading certificate" );
 
         try
         {
-            //SSLUtil.createKeyStore( "GOV1_keys.jks", "password" );
-            //X509CertImpl cert        = SSLUtil.getCertificate( "GOV1" );
 
+            /*
             X509CertImpl cert = (X509CertImpl) serviceProvider.receiveObject();
 
-            byte[]       signature   = cert.getSignature();
-            byte[]       certEncoded = SSLUtil.getInfo( cert );
+            SSLUtil.createKeyStore( "GOV1_keys.jks", "password" );
+            X509CertImpl cert =  SSLUtil.getCertificate( "GOV1" );
+            byte[] signature = cert.getSignature();
+            byte[] certEncoded = SSLUtil.getInfo( "GOV1" );
 
-            buffer = new byte[signature.length + certEncoded.length + 2];
+            buffer = new byte[ signature.length + certEncoded.length + 2 ];
 
-            buffer[0] = (byte) (certEncoded.length & 0xFF);
-            buffer[1] = (byte) ((certEncoded.length >> 8) & 0xFF);
+            buffer[0] = (byte)(certEncoded.length & 0xFF );
+            buffer[1] = (byte)((certEncoded.length >> 8) & 0xFF );
 
-            for (int i = 0; i < certEncoded.length; i++)
+            for( int i = 0; i < certEncoded.length; i++ )
                 buffer[i + 2] = certEncoded[i];
 
-            for (int i = 0; i < signature.length; i++)
+            for( int i = 0; i < signature.length; i++ )
                 buffer[i + certEncoded.length + 2] = signature[i];
+            */
+            FileInputStream fis = new FileInputStream( "cert_CUSTOM1.bob" );
+            int currentByte = 0;
+            int idx = 0;
+            byte[] tmp = new byte[1000];
+
+            while ( (currentByte = fis.read()) != -1 )
+                tmp[idx++] = (byte)currentByte;
+
+            buffer = new byte[ idx + 2 ];
+
+            int certSize = idx - 256;
+
+            buffer[0] = (byte)(certSize & 0xFF );
+            buffer[1] = (byte)((certSize >> 8) & 0xFF );
+
+            for( int i = 0; i < idx; i++ )
+                buffer[i + 2] = tmp[i];
 
             updateTransientBuffer( buffer );
 
@@ -133,6 +155,12 @@ public class Controller
             /*
             Cipher        rsaCipher  = Cipher.getInstance( "RSA/ECB/PKCS1PADDING" );
             RSAPrivateKey privateKey = (RSAPrivateKey) SSLUtil.getPrivateKey( "GOV1" );
+
+            Cipher rsaCipher = Cipher.getInstance( "RSA/ECB/PKCS1PADDING" );
+            RSAPrivateKey privateKey = (RSAPrivateKey ) SSLUtil.getPrivateKey( "CUSTOM1" );
+            rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
+
+
 
             rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
 
@@ -230,6 +258,7 @@ public class Controller
         }
 
         write( "Buffer ready" );
+
     }
 
 
