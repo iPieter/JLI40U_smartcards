@@ -175,7 +175,7 @@ public class ServiceProvider
             SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
 
             Cipher        rsaCipher  = Cipher.getInstance( "RSA/ECB/PKCS1PADDING" );
-            RSAPrivateKey privateKey = (RSAPrivateKey) SSLUtil.getPrivateKey( "GOV1" );
+            RSAPrivateKey privateKey = (RSAPrivateKey) SSLUtil.getPrivateKey( identifier );
 
             rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
 
