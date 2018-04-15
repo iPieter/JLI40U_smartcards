@@ -40,14 +40,14 @@ public class IdentityCard extends Applet
     private static final byte[] timeDelta = new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 5, 38, 92, 0}; //24 hours
     private byte isTimeOK = 0;
     private byte[] timestampExponent = new byte[] {1, 0, 1};
-    private byte[] timestampModulus = new byte[] { -96, -90, -100, -32, 75, -91, 47, 44, -118, 34, -110, 90, -63, -43, -113, -116, 10, -9, -69, 42, -13, -25, 67, -22, 85, 114, -25, -3, 72, 63, 115, -105, 65, 82, 121, -49, 26, 21, 44, -108, 33, -110, 51, 37, -50, 32, -40, 0, -66, 113, -37, 65, -85, 48, -46, 1, 102, 14, -99, -57, 20, -2, 71, 49, -8, -63, 20, -87, -11, -117, 89, 41, -120, 5, -72, -70, 86, -4, -80, 48, -52, -30, -111, 85, -81, 85, -43, 67, 93, -15, -40, -21, 46, -84, 24, 4, 10, 105, -82, 30, 7, -21, 43, -121, -11, -66, -110, 122, 1, -83, -79, 4, -49, -5, 88, -56, -56, -10, 45, -113, 57, -15, 23, -30, 103, 53, -41, -29, 121, 45, 47, -71, 39, -71, 99, -81, -79, 39, -104, 62, -114, -28, 13, -97, 51, -128, -13, -100, 54, 125, -31, -5, 80, 81, -20, 66, 118, 110, 75, -29, -33, -97, -28, -40, 41, -114, 58, 47, -75, 89, 87, 62, 27, 3, -1, 58, 47, 59, -36, -34, -51, -111, -87, -58, -47, 119, 47, 40, 78, -99, -11, -5, 104, 1, -11, -95, -32, -96, 21, 9, -1, -21, -58, -123, 105, 119, -77, 45, -121, 117, 110, -42, -101, -43, 87, 60, 119, -53, -49, -92, -52, -101, -95, -94, 97, -11, -120, -50, 118, -3, 105, 96, -44, -54, -96, 122, -125, -94, 33, 27, 71, -81, -5, -114, -62, 93, 85, 109, 121, 55, 81, 38, -119, -82, -94, -9 };
+    private byte[] timestampModulus = new byte[] { -72, -32, 55, -37, -20, -64, -115, 15, -100, 35, 37, 22, 113, -102, -114, -111, 93, 102, 111, 44, -113, -118, 120, -55, 56, -5, -47, -49, -76, -125, -45, -70, 112, -119, -108, 23, -46, -79, 107, -69, -112, 51, 67, 39, -126, 127, -110, 79, -50, 34, 74, -18, 88, -67, -97, 115, -85, -58, 9, -88, 8, -108, -52, 1, -65, -34, 79, -103, 98, 119, -46, 125, -123, -111, 100, -50, -118, -59, 48, 98, 122, 33, -99, 34, -29, 112, 53, -90, -117, 18, 74, 73, -70, -88, 103, 40, 76, -76, 5, -48, -3, 42, 69, 93, 4, 80, 106, -57, 110, 89, -79, -115, 28, 21, 50, -126, -120, 127, -90, -119, -15, -92, -127, 74, -101, -37, 101, -116, 75, -122, -17, 92, 117, -43, 72, -72, 88, 24, 60, 15, -70, -4, 55, 62, 110, 53, -6, -11, -4, -84, 83, -51, -99, 107, 22, -120, -48, 117, -62, -119, -68, -1, -3, -113, -96, -37, -45, 47, 56, -94, 115, -48, -17, 98, -92, -19, 22, -128, 48, 32, 29, -37, -104, -52, 101, 45, 113, 26, -95, 124, -9, -104, 101, 25, 114, 101, -79, 87, 78, 17, 116, 18, -52, -120, -62, -68, 98, 9, -54, 96, -31, -26, 100, 105, 102, 93, -66, -37, 93, 21, -86, -47, -30, 1, 110, -92, -125, -96, -18, -41, 28, 117, 84, -3, 5, 90, 81, 43, -96, -88, -98, 25, -69, -94, 83, 75, 112, -97, -111, -7, -5, -29, 107, 127, 126, -31 };
     private RSAPublicKey timestampPublicKey;
 
     /**
      *  CA PK
      * */
     private byte[] caExponent = new byte[] {1, 0, 1};
-    private byte[] caModulus = new byte[] {-109, 27, -123, -68, -84, 64, 70, 43, 45, 82, 20, 48, 9, -57, 125, 49, 28, -34, 35, 52, 25, -66, 115, -97, -9, 97, -65, -54, 46, 24, -53, -125, 60, 61, -59, 42, 76, -68, 62, 53, -36, 24, 16, -13, 22, -91, 46, 92, -24, 101, 6, 78, 1, -5, 110, 90, 27, 124, 46, 81, 2, -59, -61, -31, 92, 99, 70, 119, -61, -15, -18, 99, 28, 1, 31, 125, -117, -114, 30, 91, 51, 66, -27, 46, -34, -52, -4, -5, 8, 33, 100, 26, 13, -118, 38, -15, -32, -77, 16, -90, -97, -50, -102, 90, 59, -19, 84, -73, 55, 13, 49, 62, 49, -42, 106, -45, -108, -92, -104, 51, 111, -100, 34, 90, -105, -20, 54, 17, 67, -32, -11, 99, 101, 6, 5, -42, -24, -68, -92, -106, 67, 119, 71, 119, 39, -8, 40, -25, -106, -37, -112, 96, -91, 38, -70, -27, 66, -95, -28, 119, 64, -49, 109, 31, -68, -116, -53, -27, 62, 90, 17, 69, 1, -73, 65, 86, -52, 80, 62, -83, 52, -24, -15, -116, -91, 70, 69, 117, 1, 53, 47, 9, 85, 125, 90, -1, -18, -102, 81, -57, 64, 108, -19, 15, 72, -122, 30, -18, -14, 100, 60, 27, -43, 79, -9, -94, -27, -98, 4, -94, 31, 82, -75, -21, 110, 63, 46, -10, -24, -34, 51, -5, -94, -82, 123, 2, 38, 51, 39, 49, -96, -12, -80, 42, 67, 14, 12, -39, 27, 91, -121, 6, -20, 14, -36, 107};
+    private byte[] caModulus = new byte[] {-121, -45, -127, -108, -25, 90, 111, 50, -77, -105, -53, 79, -33, 106, 119, -54, -19, 51, 115, -117, -84, 19, 34, -84, -78, -14, -114, 97, -18, 109, -115, 59, -22, 7, 86, -92, -47, 28, -106, 99, -102, -80, 117, 32, -81, -81, -61, 34, 9, -77, 0, 96, 27, 106, 89, -29, -97, -4, -74, -13, 103, -58, 127, 62, 126, -15, -120, -68, 5, -113, -1, -92, 7, -103, -11, -63, 93, 27, -73, 99, -25, -52, 35, 71, -81, 110, 103, 97, 14, -81, -66, -104, 118, 24, 91, -2, 120, -114, 101, -67, 31, 119, -64, 67, -38, 34, -64, -51, -99, 70, -12, 114, 49, 17, 55, -48, 59, -25, 65, 119, 31, -70, -86, 22, 67, -63, -73, -82, 94, 105, 71, 54, -28, -17, -74, 28, 110, 72, -75, -50, 32, -84, -44, 105, -22, -96, 95, 27, 37, 112, 0, 4, -29, -20, 19, -77, -21, 83, -55, 40, -15, -29, -112, 39, -127, -87, 121, -80, 100, 54, -128, -79, -99, 16, -91, 91, -26, 110, -31, 125, -25, -54, 104, -20, 30, -65, 5, 63, 92, -38, -57, 91, -48, 30, -120, 54, -29, -72, -108, -105, 37, -81, -99, -52, 41, 126, 104, -24, -54, -108, -65, -75, 1, -97, 63, 16, 122, -110, -82, 48, -36, 17, 77, 74, 4, 33, 46, 122, -24, -59, -57, 37, 54, 69, -41, -115, -99, -70, -43, 31, -111, -44, -74, -43, 17, 32, -81, -94, 115, -52, 74, 62, 63, -76, 121, -83};
     private RSAPublicKey caPublicKey;
 
 
@@ -191,33 +191,6 @@ public class IdentityCard extends Applet
         apdu.sendBytesLong( transientOutBuffer, (short)(offset * 240), (short)240 );
     }
 
-    public byte[] getPublicKey( byte[] input, short length )
-    {
-        byte[] output = new byte[length];
-
-        for (short i = 0; i < length; i++)
-        {
-            output[i] = input[getEncodedSize() - length - 5 + 2 + i]; //TODO: remove hardcoded shit
-        }
-
-        return output;
-    }
-
-    public byte[] getSubjectName( byte[] input, short keyLength )
-    {
-        short count = 0;
-        short start = (short) (getEncodedSize() - 256 - 5 + 2 );
-        while ( count++ != input[--start] ) ;
-        byte[] output = new byte[count - 1];
-        for (short i = 0; i < count - 1; i++)
-        {
-            output[i] = input[start + i + 1];
-        }
-
-        return output;
-    }
-
-
     public byte[] getValidAfterTime( byte[] input )
     {
         short start = 40; //second value
@@ -331,8 +304,6 @@ public class IdentityCard extends Applet
         apdu.sendBytesLong( new byte[]{ 0 }, (short) 0, (short)1 );
     }
 
-
-
     private short getEncodedSize()
     {
         return (short)((short)((transientInBuffer[1] & 0xff) << 8) | ((short)transientInBuffer[0] & 0xff));
@@ -340,8 +311,6 @@ public class IdentityCard extends Applet
 
     private void authenticateSP( APDU apdu )
     {
-        byte[] n = getSubjectName( transientInBuffer, (short)256 );
-
         byte isSignatureOK = testSignature( apdu, caPublicKey, (short)2, getEncodedSize(), (short)256 );
 
         if( isSignatureOK != 1 )
@@ -375,8 +344,7 @@ public class IdentityCard extends Applet
         Cipher rsaCipher = Cipher.getInstance( Cipher.ALG_RSA_PKCS1, false );
         RSAPublicKey certPublicKey = (RSAPublicKey) KeyBuilder.buildKey( KeyBuilder.TYPE_RSA_PUBLIC, (short)2048, false );
         certPublicKey.setExponent( caExponent, (short)0, (short)caExponent.length );
-        byte [] pk = getPublicKey( transientInBuffer, (short)256 );
-        certPublicKey.setModulus( pk, (short)0, (short)256 );
+        certPublicKey.setModulus( transientInBuffer, (short)35, (short)256 );
         rsaCipher.init( certPublicKey, Cipher.MODE_ENCRYPT );
 
         byte [] encryptedKey = JCSystem.makeTransientByteArray( (short)256, JCSystem.CLEAR_ON_RESET );
@@ -389,9 +357,7 @@ public class IdentityCard extends Applet
 
         // TODO: IF TESTED, USE SECURE RANDOM
         short off = cipher.update( challenge, (short)0, (short)16, encryptedChallenge, (short)0 );
-        //byte[] name = getSubjectName( transientInBuffer, (short)256 ); //TODO: this must be 16 bytes
-        byte[] name = challenge;
-        cipher.doFinal( name, (short)0, (short)name.length, encryptedChallenge, off );
+        cipher.doFinal( transientInBuffer, (short)0, (short)16, encryptedChallenge, off );
 
         //byte [] combined = new byte[ (short)(encryptedKeySize + encryptedChallenge.length) ]; //TODO fill transient buffer here and add 2 instructions to read/clear it.
 
