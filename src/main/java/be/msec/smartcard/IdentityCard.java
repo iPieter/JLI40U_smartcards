@@ -35,9 +35,8 @@ public class IdentityCard extends Applet
     /**
      *  TimeStamp:
      * */
-    private byte[] currentTime = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-    private byte[] validationTime = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-    private static final byte[] timeDelta = new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 5, 38, 92, 0}; //24 hours
+    private byte[] currentTime = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    private byte[] validationTime = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     private byte isTimeOK = 0;
     private byte[] timestampExponent = new byte[] {1, 0, 1};
     private byte[] timestampModulus = new byte[] {-123, 6, 30, -1, -126, 77, 91, 95, 17, -14, 8, 127, 76, -55, 120, 114, -72, -55, 73, -49, 112, 125, 105, 28, 87, 90, 13, -57, 75, 87, 18, 86, 74, 65, -96, -89, -93, -80, -53, -28, 93, 30, 71, 32, 14, 124, 110, -55, 107, -47, 26, 15, 54, -61, 125, 114, 14, -11, 122, 63, -55, -64, -128, -54, -32, 119, 73, 48, -83, -123, -9, -85, -3, 5, -8, -6, 123, 102, -121, -120, -1, 107, -23, 85, -64, 78, 50, -38, -107, 100, 89, 60, 41, 13, -91, 27, -4, 29, -58, 125, -37, -30, 94, -70, -8, -60, 32, 72, 1, 69, -1, 70, 24, -11, -98, -74, -33, -97, -115, -66, 92, -100, 108, -97, 93, -98, -47, -120, -25, 57, 0, -1, 118, -62, 56, -94, 69, 107, -46, 85, -87, -121, -51, 48, -75, 53, -66, 73, -37, -14, -87, 78, -107, 120, 114, 18, -120, -18, 94, -79, -77, -24, 12, -128, -56, -15, 67, -11, 15, -18, -1, 51, -1, -98, 101, 113, -49, -6, 77, 117, 120, 52, 89, -32, -8, 108, 29, 72, 111, -96, -9, -78, -4, -72, -10, -65, 114, 65, -121, 118, -1, -39, 3, 15, 79, -25, 69, -90, 15, -99, 81, 43, -89, 80, -87, -69, -49, -83, -46, 21, -23, -121, -53, -84, -118, 121, -60, -19, -87, -89, -126, 115, 43, 121, -88, -18, -100, 68, 50, 43, -69, -124, 107, -40, 91, 125, 64, 87, -95, 58, 41, 22, -16, -103, 57, -55};
@@ -265,7 +264,7 @@ public class IdentityCard extends Applet
     {
         byte[] buffer = apdu.getBuffer();
 
-        byte reqValidation = Util.arrayCompare( validationTime, (short)0, buffer, (short)ISO7816.OFFSET_CDATA, (short)12 ); //TODO: add delta
+        byte reqValidation = Util.arrayCompare( validationTime, (short)0, buffer, (short)ISO7816.OFFSET_CDATA, (short)8 );
 
         isTimeOK = (reqValidation == (byte)(-1) ? (byte)1 : (byte)0);
 
@@ -276,7 +275,7 @@ public class IdentityCard extends Applet
 
     private void updateTime( APDU apdu )
     {
-        if( testSignature( apdu, timestampPublicKey, (short)0, (short)24, (short)256 ) != (byte) 1 )
+        if( testSignature( apdu, timestampPublicKey, (short)0, (short)16, (short)256 ) != (byte) 1 )
         {
             apdu.setOutgoing();
             apdu.setOutgoingLength( ( short ) 1 );
@@ -285,7 +284,7 @@ public class IdentityCard extends Applet
             return;
         }
 
-        byte reqValidation = Util.arrayCompare( currentTime, (short)0, transientInBuffer, (short)0, (short)12 );
+        byte reqValidation = Util.arrayCompare( currentTime, (short)0, transientInBuffer, (short)0, (short)8 );
 
         if( reqValidation >= (byte)0 )
         {
@@ -296,8 +295,8 @@ public class IdentityCard extends Applet
             return;
         }
 
-        Util.arrayCopy( transientInBuffer, (short)0, currentTime, (short)0, (short)12 );
-        Util.arrayCopy( transientInBuffer, (short)12, validationTime, (short)0, (short)12 );
+        Util.arrayCopy( transientInBuffer, (short)0, currentTime, (short)0, (short)8 );
+        Util.arrayCopy( transientInBuffer, (short)8, validationTime, (short)0, (short)8 );
 
         apdu.setOutgoing();
         apdu.setOutgoingLength( ( short ) 1 );
