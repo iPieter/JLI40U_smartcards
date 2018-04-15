@@ -177,8 +177,8 @@ public class Controller
             commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
             response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
-            write( "Smartcard response on challenge" );
             write( response.toString() );
+            write( "Response on challenge: " + response.getData()[0] );
 
             /*
             write( Arrays.toString( result ) );
