@@ -29,6 +29,8 @@ public class IdentityCard extends Applet
     private final static byte AUTHENTICATE_SP_INS   = 0x50;
     private final static byte CONFIRM_CHALLENGE_INS = 0x51;
 
+    private final static byte AUTHENTICATE_CARD_INS = 0x60;
+
     private byte[] serial = new byte[]{ 0x30, 0x35, 0x37, 0x36, 0x39, 0x30, 0x31, 0x05 };
     private OwnerPIN pin;
 
@@ -170,6 +172,9 @@ public class IdentityCard extends Applet
                 break;
             case CONFIRM_CHALLENGE_INS:
                 confirmChallenge( apdu );
+                break;
+            case AUTHENTICATE_CARD_INS:
+                authenticateCard( apdu );
                 break;
             //If no matching instructions are found it is indicated in the status word of the response.
             //This can be done by using this method. As an argument a short is given that indicates
@@ -391,6 +396,36 @@ public class IdentityCard extends Applet
         apdu.setOutgoingLength( ( short ) 1 );
         apdu.sendBytesLong( new byte[]{ isOK }, (short) 0, (short)1 );
     }
+
+    private void authenticateCard( APDU apdu )
+    {
+        //TODO auth check
+        byte buffer[] = apdu.getBuffer();
+
+        Cipher cipher = Cipher.getInstance( Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false );
+
+        cipher.init( aesKey, Cipher.MODE_DECRYPT );
+
+        byte[] decrypted = JCSystem.makeTransientByteArray( (short)16, JCSystem.CLEAR_ON_RESET );
+
+        cipher.doFinal( buffer, (short)ISO7816.OFFSET_CDATA, (short)16, decrypted, (short)0 );
+
+        //TODO add "auth"
+        //TODO add signing
+        byte[] digest = new  byte[128];
+        InitializedMessageDigest dig = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
+        dig.doFinal(decrypted, (short) 0, (short) decrypted.length, digest, (short) 0);
+
+        cipher.init( aesKey, Cipher.MODE_ENCRYPT );
+
+        byte[] output = new  byte[128];
+        cipher.doFinal( digest, (short)0, (short)128, output, (short)0 );
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength( ( short ) output.length );
+        apdu.sendBytesLong( output, (short) 0, (short)output.length );
+    }
+
 
     private byte testSignature( APDU apdu, Key key, short off, short len1, short len2 )
     {

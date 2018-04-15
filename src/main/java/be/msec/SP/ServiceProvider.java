@@ -2,6 +2,8 @@ package be.msec.SP;
 
 import be.msec.SSLUtil;
 import com.rabbitmq.client.*;
+import javacard.security.InitializedMessageDigest;
+import javacard.security.MessageDigest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +21,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.security.PrivateKey;
 import java.security.Signature;
-import java.security.cert.Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
@@ -39,6 +40,8 @@ public class ServiceProvider
     private ObjectOutputStream os;
 
     private SSLSocket c;
+
+    private byte[] symmetricKey;
 
     public static void main( String[] args )
     {
@@ -72,7 +75,13 @@ public class ServiceProvider
                 {
                     String message = new String( body, "UTF-8" );
                     LOGGER.info( "Received '{}', sending certificate", message );
+                    //step 1
                     sendCertificate( message );
+
+                    //step 2
+                    respondChallenge( message );
+
+                    //step 3
                     sendChallenge( message );
                     channel.basicAck( envelope.getDeliveryTag(), true );
 
@@ -86,6 +95,55 @@ public class ServiceProvider
             e.printStackTrace();
         }
         catch ( TimeoutException e )
+        {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendChallenge( String message )
+    {
+        try
+        {
+            LOGGER.info( "Step 3: generating own challenge" );
+            byte[] challenge = new byte[16]; // TODO: IF TESTED, USE SECURE RANDOM
+
+            for (int i = 0; i < challenge.length; i++)
+                challenge[i] = (byte) i;
+
+            //generate hash for validation
+            byte[] digest = new byte[128];
+            InitializedMessageDigest dig = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
+            dig.doFinal(challenge, (short) 0, (short) challenge.length, digest, (short) 0);
+
+            //encrypt that shit
+            SecretKey       key    = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
+
+            Cipher encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
+            byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            IvParameterSpec spec   = new IvParameterSpec( ivdata );
+            encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
+
+            byte encryptedChallenge[] = encryptCypher.doFinal( challenge, 0, 16 );
+
+            LOGGER.info("Encrypted challenge, now sending to middleware");
+
+            os.writeObject( new ByteArray( encryptedChallenge ) );
+
+            LOGGER.info( "Sent challenge, awaiting response" );
+
+            byte[] response = ((ByteArray) is.readObject()).getChallenge();
+
+
+            LOGGER.info( "Received hash. Now decrypting" );
+            encryptCypher.init( Cipher.DECRYPT_MODE, key, spec );
+            byte decryptedResponse[] = encryptCypher.doFinal( response, 0, 128 );
+
+            boolean equals = Arrays.equals( decryptedResponse, digest );
+
+            LOGGER.info( "Response is {}", equals ? "expected" : "unexpected." );
+
+        }
+        catch ( Exception e )
         {
             e.printStackTrace();
         }
@@ -109,7 +167,6 @@ public class ServiceProvider
             //Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
 
-
             while ( true )
             {
                 c = (SSLSocket) s.accept();
@@ -120,7 +177,7 @@ public class ServiceProvider
 
                 LOGGER.info( "Opened ssl stream" );
 
-                channel.basicPublish( "amq.topic", "card", null, new Card("test").generateJsonRepresentation() );
+                channel.basicPublish( "amq.topic", "card", null, new Card( "test" ).generateJsonRepresentation() );
 
             }
 
@@ -137,23 +194,25 @@ public class ServiceProvider
         try
         {
 
-            FileInputStream fis         = new FileInputStream( "cert_" + identifier +".bob" );
-            int              currentByte = 0;
-            int              idx         = 0;
-            byte[]           tmp         = new byte[1000];
+            FileInputStream fis         = new FileInputStream( "cert_" + identifier + ".bob" );
+            int             currentByte = 0;
+            int             idx         = 0;
+            byte[]          tmp         = new byte[1000];
 
             while ( (currentByte = fis.read()) != -1 )
-                tmp[idx++] = (byte)currentByte;
+                tmp[idx++] = (byte) currentByte;
 
-            byte[] buffer = new byte[ idx + 2 ];
+            byte[] buffer = new byte[idx + 2];
 
             int certSize = idx - 256;
 
-            buffer[0] = (byte)(certSize & 0xFF );
-            buffer[1] = (byte)((certSize >> 8) & 0xFF );
+            buffer[0] = (byte) (certSize & 0xFF);
+            buffer[1] = (byte) ((certSize >> 8) & 0xFF);
 
-            for( int i = 0; i < idx; i++ )
+            for (int i = 0; i < idx; i++)
                 buffer[i + 2] = tmp[i];
+
+            System.out.println(Arrays.asList( buffer ));
 
             os.writeObject( new ByteArray( buffer ) );
             LOGGER.info( "Sending certificate {} to Middleware", identifier );
@@ -164,7 +223,7 @@ public class ServiceProvider
         }
     }
 
-    private void sendChallenge( String identifier )
+    private void respondChallenge( String identifier )
     {
         try
         {
@@ -180,6 +239,8 @@ public class ServiceProvider
             rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
 
             byte[] symmKey = rsaCipher.doFinal( responseBuffer, 0, 256 );
+
+            symmetricKey = symmKey;
 
             System.out.println( Arrays.toString( symmKey ) );
 

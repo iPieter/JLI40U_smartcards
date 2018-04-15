@@ -40,7 +40,7 @@ public class Controller
     @FXML
     public void initialize()
     {
-        //serviceProvider = new SSLClient( "127.0.0.1", 1271 );
+        serviceProvider = new SSLClient( "127.0.0.1", 1271 );
 
         simulator = new Simulator();
 
@@ -138,7 +138,9 @@ public class Controller
 
         try
         {
-            write( "Sending challenge" );
+            // STEP 2 ----------
+
+            write( "Step 2: sending challenge" );
 
             serviceProvider.writeObject( new ByteArray( responseBuffer ) );
 
@@ -176,14 +178,24 @@ public class Controller
 
             ByteArray byteArray = (ByteArray) serviceProvider.receiveObject();
 
-            write( "Received new challenge" );
+            write( "Received challenge response" );
 
             commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
             response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
             write( response.toString() );
-            write( "Response on challenge: " + response.getData()[0] );
+            write( "Validation challenge: " + response.getData()[0] );
 
+            // STEP 3 ----------
+            byteArray = (ByteArray) serviceProvider.receiveObject();
+
+            write( "Step 3: received challenge" );
+            commandAPDU = new CommandAPDU( 0x80, 0x60, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
+            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+            serviceProvider.writeObject( new ByteArray( response.getData() ) );
+
+            write("Sent response to challenge.");
             /*
             write( Arrays.toString( result ) );
             System.out.println( Arrays.toString( result ) );
