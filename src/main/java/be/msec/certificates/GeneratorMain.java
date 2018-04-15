@@ -37,6 +37,11 @@ public class GeneratorMain
             PrivateKey rootPrivateKey = keyGen.getPrivateKey();
 
             X509Certificate rootCertificate = keyGen.getSelfCertificate( new X500Name( "CN=ROOT" ), (long) 365 * 24 * 60 * 60 );
+            System.out.println("======CA======");
+            System.out.println("---EXPONENT---");
+            System.out.println(Arrays.toString( ((RSAPublicKey) rootCertificate.getPublicKey()).getPublicExponent().toByteArray()));
+            System.out.println("-----MOD------");
+            System.out.println(Arrays.toString( ((RSAPublicKey) rootCertificate.getPublicKey()).getModulus().toByteArray()));            System.out.println("---EXPONENT---");
 
             storeKeyAndCertificateChain( "CA", "password".toCharArray(), "CA.jks", rootPrivateKey, new X509Certificate[]{ rootCertificate } );
 
@@ -124,6 +129,14 @@ public class GeneratorMain
             //Clear the keystore
             //clearKeyStore( provider, password, keystore );
 
+            if (provider.equals( "TIME" ))
+            {
+                System.out.println("=====TIME=====");
+                System.out.println("---EXPONENT---");
+                System.out.println(Arrays.toString( ((RSAPublicKey) topCertificate.getPublicKey()).getPublicExponent().toByteArray()));
+                System.out.println("-----MOD------");
+                System.out.println(Arrays.toString( ((RSAPublicKey) topCertificate.getPublicKey()).getModulus().toByteArray()));
+            }
         }
         catch ( Exception e )
         {

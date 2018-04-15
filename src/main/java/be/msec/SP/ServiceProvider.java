@@ -13,6 +13,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -133,12 +134,27 @@ public class ServiceProvider
     {
         try
         {
-            //TODO change for real cert
-            SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
-            Certificate certificate = SSLUtil.getCertificate( identifier );
 
-            os.writeObject( certificate );
-            System.out.println( "sending " + certificate.toString() );
+            FileInputStream fis         = new FileInputStream( "cert_" + identifier +".bob" );
+            int              currentByte = 0;
+            int              idx         = 0;
+            byte[]           tmp         = new byte[1000];
+
+            while ( (currentByte = fis.read()) != -1 )
+                tmp[idx++] = (byte)currentByte;
+
+            byte[] buffer = new byte[ idx + 2 ];
+
+            int certSize = idx - 256;
+
+            buffer[0] = (byte)(certSize & 0xFF );
+            buffer[1] = (byte)((certSize >> 8) & 0xFF );
+
+            for( int i = 0; i < idx; i++ )
+                buffer[i + 2] = tmp[i];
+
+            os.writeObject( new ByteArray( buffer ) );
+            LOGGER.info( "Sending certificate {} to Middleware", identifier );
         }
         catch ( Exception e )
         {

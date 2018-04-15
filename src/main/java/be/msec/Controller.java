@@ -9,11 +9,9 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
-import sun.security.x509.X509CertImpl;
 
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
-import java.util.Arrays;
 
 public class Controller
 {
@@ -50,7 +48,7 @@ public class Controller
 
         CommandAPDU  commandAPDU;
         ResponseAPDU response;
-        byte [] buffer;
+        byte[]       buffer;
 
         /*
         SignedTimestamp now  = getTimestampFromRemote();
@@ -105,23 +103,9 @@ public class Controller
             for( int i = 0; i < signature.length; i++ )
                 buffer[i + certEncoded.length + 2] = signature[i];
             */
-            FileInputStream fis = new FileInputStream( "cert_CUSTOM1.bob" );
-            int currentByte = 0;
-            int idx = 0;
-            byte[] tmp = new byte[1000];
 
-            while ( (currentByte = fis.read()) != -1 )
-                tmp[idx++] = (byte)currentByte;
-
-            buffer = new byte[ idx + 2 ];
-
-            int certSize = idx - 256;
-
-            buffer[0] = (byte)(certSize & 0xFF );
-            buffer[1] = (byte)((certSize >> 8) & 0xFF );
-
-            for( int i = 0; i < idx; i++ )
-                buffer[i + 2] = tmp[i];
+            //receive certificate in compact form
+            buffer = ((ByteArray) serviceProvider.receiveObject()).getChallenge();
 
             updateTransientBuffer( buffer );
 
@@ -213,11 +197,6 @@ public class Controller
 
         write( new BigInteger( 1, response.getData() ).toString( 16 ) );
         */
-
-        //TODO this is the actual certificate, from the remote server. idk how i throw it in the card
-        //provided it's the first call to receive object
-
-
     }
 
     private void updateTransientBuffer( byte[] buffer )
