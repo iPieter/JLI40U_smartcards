@@ -1,38 +1,18 @@
 package be.msec;
 
-import be.msec.smartcard.HelloWorldApplet;
-import be.msec.smartcard.IdentityCard;
-import com.licel.jcardsim.base.Simulator;
-import javacard.framework.AID;
-import javacard.framework.Util;
+import be.msec.SP.Card;
 import javafx.application.Application;
-import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 
-import javax.smartcardio.CommandAPDU;
-import javax.smartcardio.ResponseAPDU;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.math.BigInteger;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.*;
-import java.security.cert.CertificateException;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.Random;
-
-import javax.net.ssl.*;
-import java.io.*;
-import java.security.*;
-import java.security.cert.CertificateException;
 import java.util.Arrays;
 
 /**
@@ -50,64 +30,63 @@ public class Main extends Application
 
     public static void main( String[] args )
     {
-        boolean PRINT_SHITTY_KEY = true;
+        boolean PRINT_SHITTY_KEY = false;
 
-        if( PRINT_SHITTY_KEY )
+        if ( PRINT_SHITTY_KEY )
         {
             try
             {
                 SSLContext context = SSLUtil.createClientSSLContext( "CA.jks", "password" );
 
-                socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1207 );
+                socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1271 );
                 //socket.setEnabledCipherSuites( enabledCipherSuites );
 
-                Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
-                ObjectInputStream inputStream = new ObjectInputStream( socket.getInputStream() );
+                //Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
 
-                System.out.println(inputStream.readObject());
+                ObjectOutputStream os = new ObjectOutputStream( socket.getOutputStream() );
+                ObjectInputStream  is = new ObjectInputStream( socket.getInputStream() );
 
+                os.writeObject( new Card( "bob" ) );
+                System.out.println("wrote card to ssl stream");
 
+                Certificate certificate = (Certificate) is.readObject();
 
-                inputStream.close();
+                System.out.println(certificate.toString());
+                os.close();
+                is.close();
                 socket.close();
 
                 SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
 
-                RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey();
+
+                RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey( "TIME" );
                 System.out.println( Arrays.toString( key.getPublicExponent().toByteArray() ) );
                 System.out.println( Arrays.toString( key.getModulus().toByteArray() ) );
 
                 System.out.println( key.getModulus().toByteArray().length );
 
-                //RSAPrivateKey privateKey = (RSAPrivateKey) keyStore.getKey( "time", "password".toCharArray() );
 
-                //Signature signature = Signature.getInstance( "SHA1withRSA" );
-                //signature.initSign( privateKey );
-                //signature.update( new byte[]{0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04} );
+                System.out.println( "---info---" );
+                byte[] info = SSLUtil.getInfo( "time" );
+                System.out.println( Arrays.toString( info ) );
+                System.out.println( "---signature---" );
+                byte[] sign = SSLUtil.getCertificate( "time" ).getSignature();
+                System.out.println( Arrays.toString( sign ) );
+                System.out.println( "---key---" );
+                System.out.println( Arrays.toString( SSLUtil.getCertificate( "time" ).getPublicKey().getEncoded() ) );
+                System.out.println( "---name---" );
+                System.out.println( Arrays.toString( "time".getBytes() ) );
+                System.out.println( Arrays.toString( "CN=TIME".getBytes() ) );
+                System.out.println( Arrays.toString( "CN=ROOT".getBytes() ) );
+                System.out.println( Arrays.toString( "20180412090056".getBytes() ) );
+                System.out.println( Arrays.toString( "20180513090056".getBytes() ) );
+                System.out.println( Arrays.toString( ByteBuffer.allocate( Long.SIZE / Byte.SIZE ).putLong( 1526202056000L ).array() ) );
+
+
                 //System.out.println( Arrays.toString( signature.sign() ) );
                 //System.out.println( signature.sign().length );
             }
-            catch ( KeyStoreException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( IOException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( CertificateException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( NoSuchAlgorithmException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( ClassNotFoundException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( KeyManagementException e )
+            catch ( Exception e )
             {
                 e.printStackTrace();
             }
@@ -119,13 +98,12 @@ public class Main extends Application
 
     }
 
-
     @Override
     public void start( Stage stage ) throws Exception
     {
-        Parent root = FXMLLoader.load(getClass().getResource("/scene.fxml"));
-        stage.setTitle("Middleware");
-        stage.setScene(new Scene(root));
+        Parent root = FXMLLoader.load( getClass().getResource( "/scene.fxml" ) );
+        stage.setTitle( "Middleware" );
+        stage.setScene( new Scene( root ) );
         stage.show();
     }
 }

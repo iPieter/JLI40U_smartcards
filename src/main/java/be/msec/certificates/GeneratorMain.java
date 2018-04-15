@@ -1,18 +1,22 @@
 package be.msec.certificates;
 
+import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 import sun.security.tools.keytool.CertAndKeyGen;
 import sun.security.x509.*;
 
+import javax.crypto.Cipher;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.security.Key;
-import java.security.KeyStore;
-import java.security.Principal;
-import java.security.PrivateKey;
+import java.nio.ByteBuffer;
+import java.security.*;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.security.interfaces.RSAPublicKey;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.stream.IntStream;
 
 /**
  * @author Pieter
@@ -20,7 +24,8 @@ import java.util.Arrays;
  */
 public class GeneratorMain
 {
-    public static String[] PROVIDERS = { "GOV1", "GOV2", "SOCNET1", "SOCNET2", "DEFAULT1", "DEFAULT2", "CUSTOM1", "CUSTOM2", "TIME" };
+    public static String[] PROVIDERS = { "GOV1", "GOV2", "SOCNET1", "SOCNET2", "DEFAULT1", "DEFAULT2", "CUSTOM1", "CUSTOM2", "TIME", "SMARTCARD" };
+    public static String[] TYPES     = { "A", "A", "B", "B", "C", "C", "D", "D", "G", "Z" };
 
     public static void main( String[] args )
     {
@@ -32,10 +37,15 @@ public class GeneratorMain
             PrivateKey rootPrivateKey = keyGen.getPrivateKey();
 
             X509Certificate rootCertificate = keyGen.getSelfCertificate( new X500Name( "CN=ROOT" ), (long) 365 * 24 * 60 * 60 );
+            System.out.println("======CA======");
+            System.out.println("---EXPONENT---");
+            System.out.println(Arrays.toString( ((RSAPublicKey) rootCertificate.getPublicKey()).getPublicExponent().toByteArray()));
+            System.out.println("-----MOD------");
+            System.out.println(Arrays.toString( ((RSAPublicKey) rootCertificate.getPublicKey()).getModulus().toByteArray()));            System.out.println("---EXPONENT---");
 
             storeKeyAndCertificateChain( "CA", "password".toCharArray(), "CA.jks", rootPrivateKey, new X509Certificate[]{ rootCertificate } );
 
-            Arrays.stream( PROVIDERS ).forEach( name -> generateLeafProvider( name, rootCertificate, rootPrivateKey ) );
+            IntStream.range( 0, PROVIDERS.length ).forEach( idx -> { generateLeafProvider( PROVIDERS[idx], TYPES[idx], rootCertificate, rootPrivateKey ); } );
         }
         catch ( Exception ex )
         {
@@ -58,7 +68,7 @@ public class GeneratorMain
 
     }
 
-    public static void generateLeafProvider( String provider, X509Certificate rootCertificate, PrivateKey rootPrivateKey )
+    public static void generateLeafProvider( String provider, String type, X509Certificate rootCertificate, PrivateKey rootPrivateKey )
     {
         //Generate leaf certificate
         CertAndKeyGen keyGen2 = null;
@@ -82,6 +92,34 @@ public class GeneratorMain
             char[] password = "password".toCharArray();
             String keystore = provider + "_keys.jks";
 
+            String       name       = leftPad( provider, 16 );
+            long         beforeDate = topCertificate.getNotBefore().getTime();
+            long         afterDate  = topCertificate.getNotAfter().getTime();
+            RSAPublicKey pk         = (RSAPublicKey) topCertificate.getPublicKey();
+
+
+            byte [] nameBytes   = name.getBytes();
+            byte [] beforeBytes = ByteBuffer.allocate( Long.SIZE / Byte.SIZE ).putLong( beforeDate ).array();
+            byte [] afterBytes  = ByteBuffer.allocate( Long.SIZE / Byte.SIZE ).putLong( afterDate ).array();
+            byte [] classBytes  = type.getBytes();
+            byte [] pkModulus   = pk.getModulus().toByteArray();
+
+            byte [] certificate = new byte[ nameBytes.length + beforeBytes.length + afterBytes.length + classBytes.length + pkModulus.length - 1 ];
+            fill( certificate, nameBytes, classBytes, beforeBytes, afterBytes, pkModulus );
+
+            Signature signer = Signature.getInstance( "SHA1withRSA" );
+            signer.initSign( rootPrivateKey );
+            signer.update( certificate );
+            byte [] signature = signer.sign();
+
+            FileOutputStream fos = new FileOutputStream( "cert_" + provider + ".bob" );
+            fos.write( certificate );
+            fos.write( signature );
+            fos.flush();
+            fos.close();
+
+            System.out.println( "" );
+
             //Store the certificate chain
             storeKeyAndCertificateChain( provider, password, keystore, topPrivateKey, chain );
 
@@ -91,11 +129,55 @@ public class GeneratorMain
             //Clear the keystore
             //clearKeyStore( provider, password, keystore );
 
+            if (provider.equals( "TIME" ))
+            {
+                System.out.println("=====TIME=====");
+                System.out.println("---EXPONENT---");
+                System.out.println(Arrays.toString( ((RSAPublicKey) topCertificate.getPublicKey()).getPublicExponent().toByteArray()));
+                System.out.println("-----MOD------");
+                System.out.println(Arrays.toString( ((RSAPublicKey) topCertificate.getPublicKey()).getModulus().toByteArray()));
+            }
         }
         catch ( Exception e )
         {
             e.printStackTrace();
         }
+    }
+
+    private static void fill( byte[] certificate, byte[] nameBytes, byte[] classBytes, byte[] beforeBytes, byte[] afterBytes, byte[] pkModulus )
+    {
+        int off = 0;
+        for( int i = 0; i < nameBytes.length; i++ )
+            certificate[i + off] = nameBytes[i];
+        off += nameBytes.length;
+
+        for( int i = 0; i < classBytes.length; i++ )
+            certificate[i + off] = classBytes[i];
+        off += classBytes.length;
+
+        for( int i = 0; i < beforeBytes.length; i++ )
+            certificate[i + off] = beforeBytes[i];
+        off += beforeBytes.length;
+
+        for( int i = 0; i < afterBytes.length; i++ )
+            certificate[i + off] = afterBytes[i];
+        off += afterBytes.length;
+
+        for( int i = 1; i < pkModulus.length; i++ )
+            certificate[i + off - 1] = pkModulus[i];
+    }
+
+    private static String leftPad( String original, int length )
+    {
+        int difference = length - original.length();
+        if( difference < 0 )
+            return original;
+
+        String padding = "";
+        for( int i = 0; i < difference; i++ )
+            padding += "0";
+
+        return padding + original;
     }
 
     private static void loadAndDisplayChain( String alias, char[] password, String keystore ) throws Exception
