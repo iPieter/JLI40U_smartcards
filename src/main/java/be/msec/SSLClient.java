@@ -116,7 +116,7 @@ public class SSLClient
             is.close();
             socket.close();
 
-            LOGGER.info( "Closed SSL session." );
+            LOGGER.info( "Closed SSL session to {} : {}. ", socket.getInetAddress().getHostName(), socket.getPort() );
         }
         catch ( IOException e )
         {

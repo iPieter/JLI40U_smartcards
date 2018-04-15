@@ -12,6 +12,7 @@ import javax.net.ssl.SSLSocket;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.*;
+import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
 
 /**
@@ -86,14 +87,6 @@ public class Main extends Application
                 //System.out.println( signature.sign().length );
             }
             catch ( Exception e )
-            {
-                e.printStackTrace();
-            }
-            catch ( KeyManagementException e )
-            {
-                e.printStackTrace();
-            }
-            catch ( ClassNotFoundException e )
             {
                 e.printStackTrace();
             }

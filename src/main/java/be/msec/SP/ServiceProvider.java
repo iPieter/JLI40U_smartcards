@@ -5,6 +5,10 @@ import com.rabbitmq.client.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
@@ -12,12 +16,11 @@ import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
+import java.security.interfaces.RSAPrivateKey;
+import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
 
 /**
@@ -70,6 +73,8 @@ public class ServiceProvider
                     System.out.println( " [x] Received '" + message + "', sending certificate" );
                     sendCertificate( message );
                     channel.basicAck( envelope.getDeliveryTag(), true );
+
+                    sendChallenge( message );
                 }
             };
 
@@ -90,7 +95,7 @@ public class ServiceProvider
         //init ssl
         try
         {
-            //start ssl server with root keys, because
+            //start ssl server with root keys, because type is chosen later
             SSLUtil.createKeyStore( "CA.jks", "password" );
             SSLContext context = SSLUtil.createServerSSLContext();
 
@@ -126,34 +131,59 @@ public class ServiceProvider
 
     private void sendCertificate( String identifier )
     {
-//start ssl server with root keys, because
         try
         {
+            //TODO change for real cert
             SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
-            Certificate certificate = SSLUtil.getCertificate( identifier.toLowerCase() );
+            Certificate certificate = SSLUtil.getCertificate( identifier );
 
             os.writeObject( certificate );
-            System.out.println("sending " + certificate.toString());
+            System.out.println( "sending " + certificate.toString() );
         }
-        catch ( KeyStoreException e )
+        catch ( Exception e )
         {
             e.printStackTrace();
         }
-        catch ( IOException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( CertificateException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( NoSuchAlgorithmException e )
-        {
-            e.printStackTrace();
-        }
+    }
 
+    private void sendChallenge( String identifier )
+    {
+        try
+        {
+            byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
 
+            SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
 
+            Cipher        rsaCipher  = Cipher.getInstance( "RSA/ECB/PKCS1PADDING" );
+            RSAPrivateKey privateKey = (RSAPrivateKey) SSLUtil.getPrivateKey( "GOV1" );
+
+            rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
+
+            byte[] symmKey = rsaCipher.doFinal( responseBuffer, 0, 256 );
+
+            System.out.println( Arrays.toString( symmKey ) );
+
+            SecretKey       key    = new SecretKeySpec( symmKey, 0, 16, "AES" );
+            byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            IvParameterSpec spec   = new IvParameterSpec( ivdata );
+            Cipher          cipher = Cipher.getInstance( "AES/CBC/NoPadding" );
+            cipher.init( Cipher.DECRYPT_MODE, key, spec );
+
+            byte result[] = cipher.doFinal( responseBuffer, 256, 32 );
+
+            for (int i = 0; i < result.length; i++)
+                result[i] += (byte) 1;
+
+            Cipher encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
+            encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
+            byte newChallenge[] = encryptCypher.doFinal( result, 0, 16 );
+
+            os.writeObject( new ByteArray( newChallenge ) );
+        }
+        catch ( Exception e )
+        {
+            e.printStackTrace();
+        }
     }
 
 

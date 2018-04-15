@@ -85,6 +85,11 @@ public class SSLUtil
     {
         X509CertImpl certificate = (X509CertImpl) keyStore.getCertificate( alias );
 
+        return getInfo( certificate );
+    }
+
+    public static byte[] getInfo( X509CertImpl certificate ) throws KeyStoreException
+    {
         Field[] fields = certificate.getClass().getDeclaredFields();
 
         byte[] info = Arrays.stream( fields )
@@ -109,6 +114,7 @@ public class SSLUtil
 
         return info;
     }
+
 
     public static X509CertImpl getCertificate( String alias ) throws KeyStoreException
     {
@@ -139,16 +145,6 @@ public class SSLUtil
 
     }
 
-    public static Key getPrivateKey( String name ) throws UnrecoverableKeyException, NoSuchAlgorithmException, KeyStoreException
-    {
-        assert keyStore != null;
-
-        Key key = keyStore.getKey( name, "password".toCharArray() );
-
-        return key;
-    }
-
-  
     public static PublicKey getPublicKey(String alias) throws KeyStoreException
     {
         return keyStore.getCertificate( alias ).getPublicKey();
