@@ -12,6 +12,7 @@ import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
+import java.util.Arrays;
 
 /**
  * Provides utility methods to write, read and construct a SSL tunnel to a SSL Socket server.
@@ -40,10 +41,6 @@ public class SSLClient
         {
             SSLContext context = SSLUtil.createClientSSLContext( ca, password );
             socket = (SSLSocket) context.getSocketFactory().createSocket( host, port );
-
-            //socket.setEnabledCipherSuites( enabledCipherSuites );
-
-            //Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
 
             this.os = new ObjectOutputStream( socket.getOutputStream() );
             this.is = new ObjectInputStream( socket.getInputStream() );
