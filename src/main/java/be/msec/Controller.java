@@ -12,6 +12,7 @@ import javafx.scene.control.TextArea;
 
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
+import java.util.Arrays;
 
 public class Controller
 {
@@ -133,6 +134,7 @@ public class Controller
 
         try
         {
+            write( "Sending challenge" );
 
             serviceProvider.writeObject( new ByteArray( responseBuffer ) );
 
@@ -170,8 +172,13 @@ public class Controller
 
             ByteArray byteArray = (ByteArray) serviceProvider.receiveObject();
 
+            write( "Received new challenge" );
+
             commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
             response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+            write( "Smartcard response on challenge" );
+            write( response.toString() );
 
             /*
             write( Arrays.toString( result ) );

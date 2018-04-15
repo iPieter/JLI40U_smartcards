@@ -71,11 +71,11 @@ public class ServiceProvider
                         throws IOException
                 {
                     String message = new String( body, "UTF-8" );
-                    System.out.println( " [x] Received '" + message + "', sending certificate" );
+                    LOGGER.info( "Received '{}', sending certificate", message );
                     sendCertificate( message );
+                    sendChallenge( message );
                     channel.basicAck( envelope.getDeliveryTag(), true );
 
-                    sendChallenge( message );
                 }
             };
 
@@ -108,6 +108,8 @@ public class ServiceProvider
             SSLServerSocket        s   = (SSLServerSocket) ssf.createServerSocket( 1271 );
             //Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
+
+
             while ( true )
             {
                 c = (SSLSocket) s.accept();
@@ -116,9 +118,9 @@ public class ServiceProvider
                 is = new ObjectInputStream( c.getInputStream() );
                 os = new ObjectOutputStream( c.getOutputStream() );
 
-                System.out.println( "received card from ssl stream" );
+                LOGGER.info( "Opened ssl stream" );
 
-                channel.basicPublish( "amq.topic", "card", null, ((Card) is.readObject()).generateJsonRepresentation() );
+                channel.basicPublish( "amq.topic", "card", null, new Card("test").generateJsonRepresentation() );
 
             }
 
@@ -166,7 +168,9 @@ public class ServiceProvider
     {
         try
         {
+            LOGGER.info( "Waiting for challenge" );
             byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
+            LOGGER.info( "Received challenge" );
 
             SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
 
@@ -194,6 +198,7 @@ public class ServiceProvider
             encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
             byte newChallenge[] = encryptCypher.doFinal( result, 0, 16 );
 
+            LOGGER.info( "Wrote newChallenge" );
             os.writeObject( new ByteArray( newChallenge ) );
         }
         catch ( Exception e )
