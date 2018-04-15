@@ -64,7 +64,7 @@ public class Controller
         ResponseAPDU response;
         byte [] buffer;
 
-        /*
+
         SignedTimestamp now  = getTimestampFromRemote();
         byte[] time = now.getTimestamp();
 
@@ -91,7 +91,7 @@ public class Controller
         response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
         write( "Correct signature: " + (response.getData()[0] == 0) + " statuscode:" + response.getData()[0] );
-        */
+
 
         write( "Uploading certificate" );
 

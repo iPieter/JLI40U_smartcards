@@ -47,13 +47,11 @@ public class Main
                 ObjectOutputStream os = new ObjectOutputStream( c.getOutputStream() );
 
                 Date             date   = new Date();
-                SimpleDateFormat format = new SimpleDateFormat( "yyMMddhhmmss" );
-
                 Calendar calendar = Calendar.getInstance();
                 calendar.setTime( date );
                 calendar.add( Calendar.DATE, 1 );  // number of days to add
 
-                SignedTimestamp signedTimestamp = new SignedTimestamp( format.format( date ).getBytes(), signature, format.format( calendar.getTime() ).getBytes() );
+                SignedTimestamp signedTimestamp = new SignedTimestamp( date.getTime(), calendar.getTime().getTime(), signature );
 
                 os.writeObject( signedTimestamp );
 
