@@ -1,6 +1,8 @@
 package be.msec.timestamp;
 
 import be.msec.SSLUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -22,6 +24,8 @@ import java.util.TreeSet;
  */
 public class Main
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger( Main.class );
+
     public static void main( String[] args )
     {
         try
@@ -30,21 +34,30 @@ public class Main
             SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
             SSLContext context = SSLUtil.createServerSSLContext();
 
+            LOGGER.info( "Opened keystore" );
+
             //init signing
             Signature signature = Signature.getInstance( "SHA1withRSA" );
             signature.initSign( (PrivateKey) SSLUtil.getPrivateKey("TIME") );
+
+            LOGGER.info( "Created signer" );
 
             SSLServerSocketFactory ssf = context.getServerSocketFactory();
             SSLServerSocket        s   = (SSLServerSocket) ssf.createServerSocket( 1207 );
             //Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
+            LOGGER.info( "Listening for connection" );
+
             while ( true )
             {
                 SSLSocket c = (SSLSocket) s.accept();
 
+                LOGGER.info( "Connection: " + Arrays.toString( c.getEnabledProtocols() ) );
 
                 //DataInputStream is = new DataInputStream( c.getInputStream() );
                 ObjectOutputStream os = new ObjectOutputStream( c.getOutputStream() );
+
+                LOGGER.info( "Outputstream open" );
 
                 Date             date   = new Date();
                 Calendar calendar = Calendar.getInstance();
@@ -53,10 +66,17 @@ public class Main
 
                 SignedTimestamp signedTimestamp = new SignedTimestamp( date.getTime(), calendar.getTime().getTime(), signature );
 
+                LOGGER.info( "Timestamp generated: " + signedTimestamp );
+
                 os.writeObject( signedTimestamp );
+                os.flush();
+
+                LOGGER.info( "Object written" );
 
                 os.close();
                 c.close();
+
+                LOGGER.info( "Closed connection" );
             }
 
         }

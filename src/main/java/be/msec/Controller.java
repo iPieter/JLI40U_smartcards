@@ -9,6 +9,8 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
@@ -16,6 +18,8 @@ import java.util.Arrays;
 
 public class Controller
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger( Controller.class );
+
     @FXML
     private Button pinButton;
 
@@ -36,7 +40,7 @@ public class Controller
     @FXML
     public void initialize()
     {
-        serviceProvider = new SSLClient( "127.0.0.1", 1271 );
+        //serviceProvider = new SSLClient( "127.0.0.1", 1271 );
 
         simulator = new Simulator();
 
@@ -257,10 +261,14 @@ public class Controller
      */
     private SignedTimestamp getTimestampFromRemote()
     {
+        LOGGER.info( "Connecting to server" );
         SSLClient timestampClient = new SSLClient( "127.0.0.1", 1207 );
+        LOGGER.info( "Connected, fetching timestamp" );
 
         SignedTimestamp timestamp = (SignedTimestamp) timestampClient.receiveObject();
+        LOGGER.info( "Received object: " + timestamp );
 
+        LOGGER.info( "Closing connection" );
         timestampClient.close();
 
         return timestamp;
