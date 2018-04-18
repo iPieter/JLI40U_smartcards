@@ -59,7 +59,7 @@ public class Main extends Application
                 socket.close();
                 */
 
-                FileInputStream fis         = new FileInputStream( "cert_SMARTCARD.bob" );
+                FileInputStream fis         = new FileInputStream( "vincentje.jpeg" );
                 int              currentByte = 0;
                 int              idx         = 0;
                 byte[]           tmp         = new byte[1000];
@@ -71,14 +71,14 @@ public class Main extends Application
 
                 int certSize = idx - 256;
 
-                buffer[0] = (byte)(certSize & 0xFF );
-                buffer[1] = (byte)((certSize >> 8) & 0xFF );
+                buffer[0] = (byte)(idx & 0xFF );
+                buffer[1] = (byte)((idx >> 8) & 0xFF );
 
                 for( int i = 0; i < idx; i++ )
                     buffer[i + 2] = tmp[i];
 
                 System.out.println( Arrays.toString( buffer ) );
-
+                System.out.println( buffer.length );
                 SSLUtil.createKeyStore( "SMARTCARD_keys.jks", "password" );
 
 
