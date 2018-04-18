@@ -81,7 +81,7 @@ public class IdentityCard extends Applet
 
     /**
      * Citizen data
-     * - identifier = calculated(32 + 16bytes)
+     * - identifier = calculated(32 + 16bytes) =[H]=> 64 bytes
      * - name       = 64 bytes
      * - address    = 64 bytes
      * - country    = 2 bytes
@@ -89,10 +89,10 @@ public class IdentityCard extends Applet
      * - age        = calculated(1byte)
      * - gender     = 1 byte
      * +++++++++++++++++++++++++++
-     * SUM = 188
-     * - picture    = max 836 bytes
+     * SUM = 204
+     * - picture    = max 820 bytes
      */
-    private byte[] identifier = new byte[]{ 0, 0, 0, 0 };
+    private byte[] identifier = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0,0, 0, 0, 0, 0, 0, 0, 0 };
     private byte[] name       = new byte[]{48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 66, 111, 98, 32, 66, 111, 98, 122, 111, 111, 110};
     private byte[] address       = new byte[]{48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 76, 97, 110, 103, 101, 119, 101, 103, 115, 116, 114, 97, 97, 116, 32, 51};
     private byte[] country       = new byte[]{66, 69};
@@ -360,7 +360,7 @@ public class IdentityCard extends Applet
 
         // TODO: IF TESTED, USE SECURE RANDOM
         short off = cipher.update( challenge, ( short ) 0, ( short ) 16, encryptedChallenge, ( short ) 0 );
-        cipher.doFinal( transientInBuffer, ( short ) 0, ( short ) 16, encryptedChallenge, off );
+        cipher.doFinal( transientInBuffer, ( short ) 0, ( short ) 16, encryptedChallenge, off ); //Subject
 
         Util.arrayCopy( encryptedKey, ( short ) 0, transientOutBuffer, ( short ) 0, encryptedKeySize );
         Util.arrayCopy( encryptedChallenge, ( short ) 0, transientOutBuffer, encryptedKeySize, ( short ) encryptedChallenge.length );
@@ -442,17 +442,26 @@ public class IdentityCard extends Applet
 
         if( !pin.check( buffer, ISO7816.OFFSET_CDATA, PIN_SIZE ))
         {
-            //Throw?
+            apdu.setOutgoing();
+            apdu.setOutgoingLength( ( short ) 1 );
+            apdu.sendBytesLong( new byte[]{ 1 }, ( short ) 0, ( short ) 1 );
+            return;
         }
 
         if( !auth )
         {
-            //Error
+            apdu.setOutgoing();
+            apdu.setOutgoingLength( ( short ) 1 );
+            apdu.sendBytesLong( new byte[]{ 2 }, ( short ) 0, ( short ) 1 );
+            return;
         }
 
         if( !hasPermissions( transientInBuffer[(short)16], buffer[(short)(ISO7816.OFFSET_CDATA + PIN_SIZE)] ) )
         {
-            //Error
+            apdu.setOutgoing();
+            apdu.setOutgoingLength( ( short ) 1 );
+            apdu.sendBytesLong( new byte[]{ 3 }, ( short ) 0, ( short ) 1 );
+            return;
         }
 
         byte[] tempBuffer = JCSystem.makeTransientByteArray( (short)1024, JCSystem.CLEAR_ON_RESET );
@@ -469,6 +478,10 @@ public class IdentityCard extends Applet
         {
             cipher.update( tempBuffer, (short)(i * (short)16), (short)16, transientOutBuffer, (short)((short)2 + i * (short)16) );
         }
+
+        apdu.setOutgoing();
+        apdu.setOutgoingLength( ( short ) 1 );
+        apdu.sendBytesLong( new byte[]{ 0 }, ( short ) 0, ( short ) 1 );
     }
 
     private short fillBufferWithAttributes( byte[] buffer, byte request )
@@ -476,9 +489,12 @@ public class IdentityCard extends Applet
         short offset = 0;
         if( (byte)(request & IDENTIFIER_BIT) != (byte) 0)
         {
-            //TODO: calculate the identifier here
-            Util.arrayCopy( identifier, (short)0, buffer, offset, (short) identifier.length );
+            InitializedMessageDigest dig    = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
+            dig.update( identifier, (short)0, (short)identifier.length ); //Update with personal key K_u
+            dig.doFinal( transientInBuffer, ( short ) 0, ( short ) 16, buffer, offset ); //Update with subject name
+
             offset = (short)(offset + identifier.length);
+            offset = (short)(offset + (short)16);
         }
         if( (byte)(request & NAME_BIT) != (byte) 0)
         {
