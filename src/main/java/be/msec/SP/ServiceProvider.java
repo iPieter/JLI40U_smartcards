@@ -314,8 +314,13 @@ public class ServiceProvider
                 }
                 else
                 {
-                    log( "invalid request for data" );
+                    log( "invalid request for data " + i );
+
+                    channel.basicPublish( "amq.topic", "data", null,
+                            new IdentityInformation(mask[0]).generateJsonRepresentation() );
+
                 }
+
             }
             catch ( IOException e )
             {

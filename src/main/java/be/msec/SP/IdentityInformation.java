@@ -6,7 +6,6 @@ import org.nd4j.shade.jackson.databind.ObjectWriter;
 
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.List;
 
 /**
  * @author Pieter
@@ -14,17 +13,25 @@ import java.util.List;
  */
 public class IdentityInformation
 {
-    private byte[] data;
-    private String information;
+    private byte[]  data;
+    private String  information;
+    private boolean permission;
 
     public IdentityInformation( byte[] data, byte information )
     {
         this.data = data;
-        switch (information)
+        this.permission = true;
+        infoparser( information );
+    }
+
+    public String infoparser( byte info )
+    {
+        switch (info)
         {
             case 1 << 0:
                 this.information = "Picture";
-                this.data = Base64.getEncoder().encode( data );
+                if ( this.data != null )
+                    this.data = Base64.getEncoder().encode( this.data );
                 break;
             case 1 << 1:
                 this.information = "Gender";
@@ -40,27 +47,40 @@ public class IdentityInformation
                 break;
             case 1 << 5:
                 this.information = "Address";
-                this.data = removePadding(this.data);
+                if ( this.data != null )
+                    this.data = removePadding( this.data );
                 break;
             case 1 << 6:
                 this.information = "Name";
-                this.data = removePadding(this.data);
+                if ( this.data != null )
+                    this.data = removePadding( this.data );
                 break;
             case (byte) (1 << 7):
-                this.data = Base64.getEncoder().encode( data );
+                if ( this.data != null )
+                    this.data = Base64.getEncoder().encode( this.data );
                 this.information = "Identifier";
                 break;
             default:
 
         }
+
+        return this.information;
+    }
+
+    public IdentityInformation( byte information )
+    {
+        this.permission = false;
+        infoparser( information );
     }
 
     private byte[] removePadding( byte[] input )
     {
         int index = 0;
-        while( input[index++] == (byte)48  ){}
+        while ( input[index++] == (byte) 48 )
+        {
+        }
 
-        return Arrays.copyOfRange( input, index - 1, input.length);
+        return Arrays.copyOfRange( input, index - 1, input.length );
     }
 
 
@@ -74,6 +94,8 @@ public class IdentityInformation
 
     public String getData()
     {
+        if (data == null)
+            return "";
         if ( information.equals( "Picture" ) )
             return "data:image/jpeg;base64," + new String( data );
         return new String( data );
@@ -83,5 +105,10 @@ public class IdentityInformation
     public String getInformation()
     {
         return information;
+    }
+
+    public boolean isPermission()
+    {
+        return permission;
     }
 }

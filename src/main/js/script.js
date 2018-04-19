@@ -53,7 +53,7 @@ var on_error = function () {
 function subscribeToQueue(name, dict) {
     return client.subscribe(name, function (d) {
         let json = JSON.parse(d.body);
-        dict.push(json);
+        dict.unshift(json);
         //Vue.set(dict, d, json)
     });
 }
