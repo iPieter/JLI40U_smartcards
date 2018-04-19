@@ -7,8 +7,7 @@ import javacard.security.MessageDigest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
+import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLContext;
@@ -19,8 +18,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.security.PrivateKey;
-import java.security.Signature;
+import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
 import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
@@ -90,15 +88,25 @@ public class ServiceProvider
                     throws IOException
             {
                 String message = new String( body, "UTF-8" );
-                log( "Received '" + message + "', sending certificate" );
-                //step 1
-                sendCertificate( message );
+                if ( c != null && c.isConnected() )
+                {
+                    log( "Received '" + message + "', sending certificate" );
+                    //step 1
+                    sendCertificate( message );
 
-                //step 2
-                respondChallenge( message );
+                    //step 2
+                    respondChallenge( message );
 
-                //step 3
-                sendChallenge( message );
+                    //step 3
+                    sendChallenge( message );
+
+                    //step 4
+                    requestPersonalInformation();
+                }
+                else
+                {
+                    log( "Received " + message + ", but no socket connection. Message will be ignored." );
+                }
                 channel.basicAck( envelope.getDeliveryTag(), true );
 
             }
@@ -271,6 +279,75 @@ public class ServiceProvider
         {
             e.printStackTrace();
         }
+    }
+
+    private void requestPersonalInformation()
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            //ByteArray mask = (ByteArray) serviceProvider.receiveObject();
+
+            byte[] mask = new byte[]{ (byte) (1 << i) };
+
+            try
+            {
+                os.writeObject( new ByteArray( mask ) );
+
+
+                SecretKey       key    = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
+                byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                IvParameterSpec spec   = new IvParameterSpec( ivdata );
+                Cipher          cipher = Cipher.getInstance( "AES/CBC/NoPadding" );
+                cipher.init( Cipher.DECRYPT_MODE, key, spec );
+
+                byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
+                if ( responseBuffer.length > 0 )
+                {
+                    byte result[] = cipher.doFinal( responseBuffer, 0,32 );
+
+                    log( "received info for " + i );
+                    System.out.println( Arrays.toString( result ) );
+                }
+                else
+                {
+                    log( "invalid request for data" );
+                }
+            }
+            catch ( IOException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( NoSuchAlgorithmException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( InvalidKeyException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( InvalidAlgorithmParameterException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( NoSuchPaddingException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( BadPaddingException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( ClassNotFoundException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( IllegalBlockSizeException e )
+            {
+                e.printStackTrace();
+            }
+
+        }
+
     }
 
     private void log( String event )

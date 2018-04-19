@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
 import java.util.Arrays;
+import java.util.Collections;
 
 public class Controller
 {
@@ -207,12 +208,11 @@ public class Controller
             */
 
             //STEP 4 until the world ends
-            //while ( serviceProvider.isAvailiable() )
-            for(int i = 0; i < 8; i++)
+            while ( serviceProvider.isAvailiable() )
             {
-                //ByteArray mask = (ByteArray) serviceProvider.receiveObject();
+                ByteArray mask = (ByteArray) serviceProvider.receiveObject();
 
-                commandAPDU = new CommandAPDU( 0x80, 0x70, 0x00, 0x00, new byte[]{ 0x01, 0x02, 0x03, 0x04, (byte)(1 << i)} );
+                commandAPDU = new CommandAPDU( 0x80, 0x70, 0x00, 0x00, new byte[]{ 0x01, 0x02, 0x03, 0x04, mask.getChallenge()[0]} );
                 response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
                 System.out.println(Arrays.toString( response.getData()));
 
@@ -220,13 +220,16 @@ public class Controller
                 //1 wrong pin
                 //2 not authenticated
                 //3 no permission
+                if ( response.getData()[0] == 0x00) {
+                    byte[] personalInformation = readTransientBuffier();
+                    System.out.println( Arrays.toString(personalInformation));
+                    serviceProvider.writeObject( new ByteArray( personalInformation ) );
+                } else
+                {
+                    serviceProvider.writeObject( new ByteArray( new byte[0] ) );
+                }
 
-                byte[] personalInformation = readTransientBuffier();
 
-                System.out.println("--pers. info: " + i);
-                System.out.println( Arrays.toString(personalInformation));
-
-                serviceProvider.writeObject( new ByteArray( personalInformation ) );
 
             }
         }
@@ -311,7 +314,7 @@ public class Controller
 
         int size = getEncodedSize( responseBuffer );
 
-        byte[] shortened = Arrays.copyOfRange(responseBuffer, 2, size + 2 );
+        byte[] shortened = Arrays.copyOfRange(responseBuffer, 2, 16 * (size / 16 + 1) + 2 );
 
         return shortened;
     }
