@@ -47,57 +47,65 @@ public class ServiceProvider
     {
         ServiceProvider serviceProvider = new ServiceProvider();
 
+        try
+        {
+            serviceProvider.initAMQP();
+            serviceProvider.startSSLServer();
+        }
+        catch ( IOException | TimeoutException e )
+        {
+            LOGGER.info( "starting headless" );
+            String message = "DEFAULT1";
 
-        serviceProvider.initAMQP();
-        serviceProvider.startSSLServer();
+            //step 1
+            serviceProvider.sendCertificate( message );
+
+            //step 2
+            serviceProvider.respondChallenge( message );
+
+            //step 3
+            serviceProvider.sendChallenge( message );
+        }
         serviceProvider.close();
     }
 
-    private void initAMQP()
+    private void initAMQP() throws IOException, TimeoutException
     {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost( "localhost" );
         factory.setPort( 5672 );
-        connection = null;
-        try
+
+        LOGGER.info( "Created factory" );
+
+        connection = factory.newConnection();
+        LOGGER.info( "Connected" );
+        channel = connection.createChannel();
+        channel.exchangeDeclare( "amq.topic", BuiltinExchangeType.TOPIC, true );
+
+        Consumer consumer = new DefaultConsumer( channel )
         {
-            connection = factory.newConnection();
-            channel = connection.createChannel();
-
-            channel.exchangeDeclare( "amq.topic", BuiltinExchangeType.TOPIC, true );
-
-            Consumer consumer = new DefaultConsumer( channel )
+            @Override
+            public void handleDelivery( String consumerTag, Envelope envelope,
+                                        AMQP.BasicProperties properties, byte[] body )
+                    throws IOException
             {
-                @Override
-                public void handleDelivery( String consumerTag, Envelope envelope,
-                                            AMQP.BasicProperties properties, byte[] body )
-                        throws IOException
-                {
-                    String message = new String( body, "UTF-8" );
-                    log( "Received '"+message+"', sending certificate" );
-                    //step 1
-                    sendCertificate( message );
+                String message = new String( body, "UTF-8" );
+                log( "Received '" + message + "', sending certificate" );
+                //step 1
+                sendCertificate( message );
 
-                    //step 2
-                    respondChallenge( message );
+                //step 2
+                respondChallenge( message );
 
-                    //step 3
-                    sendChallenge( message );
-                    channel.basicAck( envelope.getDeliveryTag(), true );
+                //step 3
+                sendChallenge( message );
+                channel.basicAck( envelope.getDeliveryTag(), true );
 
-                }
-            };
+            }
+        };
 
-            channel.basicConsume( "sp", consumer );
-        }
-        catch ( IOException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( TimeoutException e )
-        {
-            e.printStackTrace();
-        }
+        channel.basicConsume( "sp", consumer );
+        LOGGER.info( "created consumer for channel sp." );
     }
 
     private void sendChallenge( String message )
@@ -111,21 +119,21 @@ public class ServiceProvider
                 challenge[i] = (byte) i;
 
             //generate hash for validation
-            byte[] digest = new byte[128];
-            InitializedMessageDigest dig = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
-            dig.doFinal(challenge, (short) 0, (short) challenge.length, digest, (short) 0);
+            byte[]                   digest = new byte[128];
+            InitializedMessageDigest dig    = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
+            dig.doFinal( challenge, (short) 0, (short) challenge.length, digest, (short) 0 );
 
             //encrypt that shit
-            SecretKey       key    = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
+            SecretKey key = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
 
-            Cipher encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
-            byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-            IvParameterSpec spec   = new IvParameterSpec( ivdata );
+            Cipher          encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
+            byte[]          ivdata        = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            IvParameterSpec spec          = new IvParameterSpec( ivdata );
             encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
 
             byte encryptedChallenge[] = encryptCypher.doFinal( challenge, 0, 16 );
 
-            log("Encrypted challenge, now sending to middleware");
+            log( "Encrypted challenge, now sending to middleware" );
 
             os.writeObject( new ByteArray( encryptedChallenge ) );
 
@@ -140,7 +148,7 @@ public class ServiceProvider
 
             boolean equals = Arrays.equals( decryptedResponse, digest );
 
-            log( "Response is " + (equals ? "expected" : "unexpected." ));
+            log( "Response is " + (equals ? "expected" : "unexpected.") );
 
         }
         catch ( Exception e )
@@ -176,9 +184,6 @@ public class ServiceProvider
                 os = new ObjectOutputStream( c.getOutputStream() );
 
                 LOGGER.info( "Opened ssl stream" );
-
-                channel.basicPublish( "amq.topic", "card", null, new Card( "test" ).generateJsonRepresentation() );
-
             }
 
 
@@ -212,10 +217,10 @@ public class ServiceProvider
             for (int i = 0; i < idx; i++)
                 buffer[i + 2] = tmp[i];
 
-            System.out.println(Arrays.asList( buffer ));
+            System.out.println( Arrays.asList( buffer ) );
 
             os.writeObject( new ByteArray( buffer ) );
-            log( "Sending certificate "+identifier+" to Middleware" );
+            log( "Sending certificate " + identifier + " to Middleware" );
         }
         catch ( Exception e )
         {
@@ -268,13 +273,13 @@ public class ServiceProvider
         }
     }
 
-    private void log(String event)
+    private void log( String event )
     {
         LOGGER.info( event );
         try
         {
             channel.basicPublish( "amq.topic", "card", null,
-                    new Event( Event.Level.SUCCESS, event).generateJsonRepresentation());
+                    new Event( Event.Level.SUCCESS, event ).generateJsonRepresentation() );
         }
         catch ( IOException e )
         {

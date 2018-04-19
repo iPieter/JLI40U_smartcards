@@ -120,4 +120,9 @@ public class SSLClient
             e.printStackTrace();
         }
     }
+
+    public boolean isAvailiable()
+    {
+        return  socket.isConnected();
+    }
 }

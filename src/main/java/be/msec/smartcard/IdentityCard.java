@@ -31,6 +31,9 @@ public class IdentityCard extends Applet
 
     private final static byte AUTHENTICATE_CARD_INS = 0x60;
 
+    private final static byte ATTRIBUTE_QUERY_INS = 0x70;
+
+
     private byte[] serial = new byte[]{ 0x30, 0x35, 0x37, 0x36, 0x39, 0x30, 0x31, 0x05 };
     private OwnerPIN pin;
 
@@ -109,8 +112,9 @@ public class IdentityCard extends Applet
     private final byte GENDER_BIT     = ( byte ) ( 1 << 1 );
     private final byte PICTURE_BIT    = ( byte ) ( 1 << 0 );
 
-    private final byte E_GOV_MASK   = IDENTIFIER_BIT | NAME_BIT | ADDRESS_BIT | COUNTRY_BIT | BIRTHDAY_BIT | AGE_BIT | GENDER_BIT;
+    private final byte E_GOV_MASK = IDENTIFIER_BIT | NAME_BIT | ADDRESS_BIT | COUNTRY_BIT | BIRTHDAY_BIT | AGE_BIT | GENDER_BIT;
     private final byte SOC_NET_MASK = IDENTIFIER_BIT | NAME_BIT | COUNTRY_BIT | AGE_BIT | GENDER_BIT | PICTURE_BIT;
+    private final byte CUSTOM_MASK  = IDENTIFIER_BIT | NAME_BIT | PICTURE_BIT;
     private final byte DEFAULT_MASK = IDENTIFIER_BIT | AGE_BIT;
 
     private IdentityCard()
@@ -223,6 +227,9 @@ public class IdentityCard extends Applet
             case AUTHENTICATE_CARD_INS:
                 authenticateCard( apdu );
                 break;
+            case ATTRIBUTE_QUERY_INS:
+                attributeQuery( apdu );
+                break;
             //If no matching instructions are found it is indicated in the status word of the response.
             //This can be done by using this method. As an argument a short is given that indicates
             //the type of warning. There are several predefined warnings in the 'ISO7816' class.
@@ -324,8 +331,8 @@ public class IdentityCard extends Applet
             return;
         }
 
-        if ( Util.arrayCompare( currentTime, ( short ) 0, transientInBuffer, ( short ) 16, ( short ) 8 ) == ( byte ) -1 ||
-                Util.arrayCompare( currentTime, ( short ) 0, transientInBuffer, ( short ) 24, ( short ) 8 ) == ( byte ) 1 )
+        if ( Util.arrayCompare( currentTime, ( short ) 0, transientInBuffer, ( short ) 19, ( short ) 8 ) == ( byte ) -1 ||
+                Util.arrayCompare( currentTime, ( short ) 0, transientInBuffer, ( short ) 27, ( short ) 8 ) == ( byte ) 1 )
         {
             apdu.setOutgoing();
             apdu.setOutgoingLength( ( short ) 1 );
@@ -463,7 +470,7 @@ public class IdentityCard extends Applet
             return;
         }
 
-        if( !hasPermissions( transientInBuffer[(short)16], buffer[(short)(ISO7816.OFFSET_CDATA + PIN_SIZE)] ) )
+        if( !hasPermissions( transientInBuffer[(short)18], buffer[(short)(ISO7816.OFFSET_CDATA + PIN_SIZE)] ) )
         {
             apdu.setOutgoing();
             apdu.setOutgoingLength( ( short ) 1 );
