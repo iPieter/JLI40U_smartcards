@@ -289,6 +289,8 @@ public class ServiceProvider
 
             byte[] mask = new byte[]{ (byte) (1 << i) };
 
+            mask[0] = (byte)(i << 7);
+
             try
             {
                 os.writeObject( new ByteArray( mask ) );
@@ -303,7 +305,7 @@ public class ServiceProvider
                 byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
                 if ( responseBuffer.length > 0 )
                 {
-                    byte result[] = cipher.doFinal( responseBuffer, 0,32 );
+                    byte result[] = cipher.doFinal( responseBuffer, 0, responseBuffer.length );
 
                     log( "received info for " + i );
                     System.out.println( Arrays.toString( result ) );

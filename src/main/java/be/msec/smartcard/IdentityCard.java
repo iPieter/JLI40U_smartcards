@@ -505,9 +505,9 @@ public class IdentityCard extends Applet
         {
             InitializedMessageDigest dig    = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
             dig.update( identifier, (short)0, (short)identifier.length ); //Update with personal key K_u
-            dig.doFinal( transientInBuffer, ( short ) 0, ( short ) 16, buffer, offset ); //Update with subject name
+            short off = dig.doFinal( transientInBuffer, ( short ) 0, ( short ) 16, buffer, offset ); //Update with subject name
 
-            offset = (short)(offset + (short)64);
+            offset = (short)(offset + off);
         }
         if( (byte)(request & NAME_BIT) != (byte) 0)
         {
