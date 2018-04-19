@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
 import java.util.Arrays;
-import java.util.Collections;
 
 public class Controller
 {
@@ -221,7 +220,7 @@ public class Controller
                 //2 not authenticated
                 //3 no permission
                 if ( response.getData()[0] == 0x00) {
-                    byte[] personalInformation = readTransientBuffier();
+                    byte[] personalInformation = readTransientBuffer();
                     System.out.println( Arrays.toString(personalInformation));
                     serviceProvider.writeObject( new ByteArray( personalInformation ) );
                 } else
@@ -299,7 +298,7 @@ public class Controller
      *
      * @return A byte array with all the data.
      */
-    public byte[] readTransientBuffier()
+    public byte[] readTransientBuffer()
     {
         byte[] responseBuffer = new byte[1024];
 
@@ -314,7 +313,7 @@ public class Controller
 
         int size = getEncodedSize( responseBuffer );
 
-        byte[] shortened = Arrays.copyOfRange(responseBuffer, 2, 16 * (size / 16 + 1) + 2 );
+        byte[] shortened = Arrays.copyOfRange(responseBuffer, 0, 16 * (size / 16 + 1) + 2 );
 
         return shortened;
     }

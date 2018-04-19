@@ -281,6 +281,11 @@ public class ServiceProvider
         }
     }
 
+    private short getEncodedSize(byte[] buffer)
+    {
+        return ( short ) ( ( short ) ( ( buffer[ 1 ] & 0xff ) << 8 ) | ( ( short ) buffer[ 0 ] & 0xff ) );
+    }
+
     private void requestPersonalInformation()
     {
         for (int i = 0; i < 8; i++)
@@ -289,7 +294,7 @@ public class ServiceProvider
 
             byte[] mask = new byte[]{ (byte) (1 << i) };
 
-            mask[0] = (byte)(i << 7);
+            mask[0] = (byte)(1 << 6);
 
             try
             {
@@ -305,10 +310,10 @@ public class ServiceProvider
                 byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
                 if ( responseBuffer.length > 0 )
                 {
-                    byte result[] = cipher.doFinal( responseBuffer, 0, responseBuffer.length );
+                    byte result[] = cipher.doFinal( responseBuffer, 2, responseBuffer.length - 2 );
 
                     log( "received info for " + i );
-                    System.out.println( Arrays.toString( result ) );
+                    System.out.println( Arrays.toString( Arrays.copyOfRange( result, 0, getEncodedSize( responseBuffer ) ) ) );
                 }
                 else
                 {
