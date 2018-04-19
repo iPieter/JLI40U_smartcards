@@ -74,7 +74,7 @@ public class ServiceProvider
                         throws IOException
                 {
                     String message = new String( body, "UTF-8" );
-                    LOGGER.info( "Received '{}', sending certificate", message );
+                    log( "Received '"+message+"', sending certificate" );
                     //step 1
                     sendCertificate( message );
 
@@ -104,7 +104,7 @@ public class ServiceProvider
     {
         try
         {
-            LOGGER.info( "Step 3: generating own challenge" );
+            log( "Step 3: generating own challenge" );
             byte[] challenge = new byte[16]; // TODO: IF TESTED, USE SECURE RANDOM
 
             for (int i = 0; i < challenge.length; i++)
@@ -125,22 +125,22 @@ public class ServiceProvider
 
             byte encryptedChallenge[] = encryptCypher.doFinal( challenge, 0, 16 );
 
-            LOGGER.info("Encrypted challenge, now sending to middleware");
+            log("Encrypted challenge, now sending to middleware");
 
             os.writeObject( new ByteArray( encryptedChallenge ) );
 
-            LOGGER.info( "Sent challenge, awaiting response" );
+            log( "Sent challenge, awaiting response" );
 
             byte[] response = ((ByteArray) is.readObject()).getChallenge();
 
 
-            LOGGER.info( "Received hash. Now decrypting" );
+            log( "Received hash. Now decrypting" );
             encryptCypher.init( Cipher.DECRYPT_MODE, key, spec );
             byte decryptedResponse[] = encryptCypher.doFinal( response, 0, 128 );
 
             boolean equals = Arrays.equals( decryptedResponse, digest );
 
-            LOGGER.info( "Response is {}", equals ? "expected" : "unexpected." );
+            log( "Response is " + (equals ? "expected" : "unexpected." ));
 
         }
         catch ( Exception e )
@@ -215,7 +215,7 @@ public class ServiceProvider
             System.out.println(Arrays.asList( buffer ));
 
             os.writeObject( new ByteArray( buffer ) );
-            LOGGER.info( "Sending certificate {} to Middleware", identifier );
+            log( "Sending certificate "+identifier+" to Middleware" );
         }
         catch ( Exception e )
         {
@@ -227,9 +227,9 @@ public class ServiceProvider
     {
         try
         {
-            LOGGER.info( "Waiting for challenge" );
+            log( "Waiting for challenge" );
             byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
-            LOGGER.info( "Received challenge" );
+            log( "Received challenge" );
 
             SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
 
@@ -259,13 +259,28 @@ public class ServiceProvider
             encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
             byte newChallenge[] = encryptCypher.doFinal( result, 0, 16 );
 
-            LOGGER.info( "Wrote newChallenge" );
+            log( "Wrote newChallenge" );
             os.writeObject( new ByteArray( newChallenge ) );
         }
         catch ( Exception e )
         {
             e.printStackTrace();
         }
+    }
+
+    private void log(String event)
+    {
+        LOGGER.info( event );
+        try
+        {
+            channel.basicPublish( "amq.topic", "card", null,
+                    new Event( Event.Level.SUCCESS, event).generateJsonRepresentation());
+        }
+        catch ( IOException e )
+        {
+            e.printStackTrace();
+        }
+
     }
 
 

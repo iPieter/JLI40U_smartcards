@@ -1,7 +1,7 @@
 var app = new Vue({
     el: '#app',
     data: {
-        cards: {},
+        cards: [],
         connected: false,
         ip: "127.0.0.1:15674",
         spValue: 'GOV1',
@@ -44,7 +44,8 @@ var on_error = function () {
 function subscribeToQueue(name, dict) {
     return client.subscribe(name, function (d) {
         let json = JSON.parse(d.body);
-        Vue.set(dict, json.key, json)
+        dict.push(json);
+        //Vue.set(dict, d, json)
     });
 }
 
