@@ -77,6 +77,34 @@
             </div>
 
         </div>
+        <div class="col-sm-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <b>Cards</b>
+                </div>
+                <ul class="list-group">
+                    <li v-for="item in data" class="list-group-item">
+
+
+                        <div class="pad left-green">
+                            <div class="row">
+                                <b>Type:</b> {{ removePadding(item.information) }}
+                            </div>
+                            <template v-if="item.information == 'Picture'">
+                                <img :src="item.data"/>
+                            </template>
+                            <template v-else>
+                                <div class="row">
+                                    {{ item.data }}
+                                </div>
+                            </template>
+                        </div>
+
+
+                    </li>
+                </ul>
+            </div>
+        </div>
 
     </div>
 

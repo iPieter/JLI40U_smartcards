@@ -14,10 +14,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
 import java.util.Arrays;
@@ -294,8 +291,6 @@ public class ServiceProvider
 
             byte[] mask = new byte[]{ (byte) (1 << i) };
 
-            mask[0] = (byte)(1 << 6);
-
             try
             {
                 os.writeObject( new ByteArray( mask ) );
@@ -313,7 +308,9 @@ public class ServiceProvider
                     byte result[] = cipher.doFinal( responseBuffer, 2, responseBuffer.length - 2 );
 
                     log( "received info for " + i );
-                    System.out.println( Arrays.toString( Arrays.copyOfRange( result, 0, getEncodedSize( responseBuffer ) ) ) );
+                    channel.basicPublish( "amq.topic", "data", null,
+                            new IdentityInformation(Arrays.copyOfRange( result, 0, getEncodedSize( responseBuffer ) ), mask[0]).generateJsonRepresentation() );
+
                 }
                 else
                 {
