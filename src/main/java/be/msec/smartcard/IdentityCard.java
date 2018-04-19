@@ -398,7 +398,12 @@ public class IdentityCard extends Applet
 
     private void authenticateCard( APDU apdu )
     {
-        //TODO auth check
+        if( !auth )
+        {
+            apdu.setOutgoing();
+            apdu.setOutgoingLength( ( short ) 1 );
+            apdu.sendBytesLong( new byte[]{ 1 }, ( short ) 0, ( short )1 );
+        }
         byte buffer[] = apdu.getBuffer();
 
         Cipher cipher = Cipher.getInstance( Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false );
@@ -416,6 +421,8 @@ public class IdentityCard extends Applet
         dig.doFinal( decrypted, ( short ) 0, ( short ) decrypted.length, digest, ( short ) 0 );
 
         cipher.init( aesKey, Cipher.MODE_ENCRYPT );
+
+
 
         byte[] output = new byte[ 128 ];
         cipher.doFinal( digest, ( short ) 0, ( short ) 128, output, ( short ) 0 );
@@ -493,8 +500,7 @@ public class IdentityCard extends Applet
             dig.update( identifier, (short)0, (short)identifier.length ); //Update with personal key K_u
             dig.doFinal( transientInBuffer, ( short ) 0, ( short ) 16, buffer, offset ); //Update with subject name
 
-            offset = (short)(offset + identifier.length);
-            offset = (short)(offset + (short)16);
+            offset = (short)(offset + (short)64);
         }
         if( (byte)(request & NAME_BIT) != (byte) 0)
         {
