@@ -559,6 +559,8 @@ public class IdentityCard extends Applet
                 return (byte)(SOC_NET_MASK | request) == SOC_NET_MASK;
             case (byte)'C':
                 return (byte)(DEFAULT_MASK | request) == DEFAULT_MASK;
+            case (byte)'D':
+                return (byte)(CUSTOM_MASK | request) == CUSTOM_MASK;
             default:
                 return false;
         }
