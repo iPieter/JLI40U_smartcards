@@ -136,7 +136,7 @@ public class IdentityCard extends Applet
 
         sharedPrivateKey = ( RSAPrivateKey ) KeyBuilder.buildKey( KeyBuilder.TYPE_RSA_PRIVATE, ( short ) 2048, false );
         sharedPrivateKey.setExponent( sharedExpontent, ( short ) 0, ( short ) sharedExpontent.length );
-        sharedPrivateKey.setModulus( sharedCert, ( short ) ( sharedCert.length - 256 ), ( short ) 256 );
+        sharedPrivateKey.setModulus( sharedCert, ( short ) ( sharedCert.length - 256 - 256 ), ( short ) 256 );
 
         transientInBuffer = JCSystem.makeTransientByteArray( MAX_BUFFER_SIZE, JCSystem.CLEAR_ON_RESET );
         transientOutBuffer = JCSystem.makeTransientByteArray( MAX_BUFFER_SIZE, JCSystem.CLEAR_ON_RESET );
@@ -421,22 +421,33 @@ public class IdentityCard extends Applet
 
         cipher.doFinal( buffer, ( short ) ISO7816.OFFSET_CDATA, ( short ) 16, decrypted, ( short ) 0 );
 
-        //TODO add "auth"
-        //TODO add signing
-        byte[]                   digest = new byte[ 128 ];
+        byte[] digest = new byte[ 32 ];
         InitializedMessageDigest dig    = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
-        dig.doFinal( decrypted, ( short ) 0, ( short ) decrypted.length, digest, ( short ) 0 );
+        dig.update( decrypted, ( short ) 0, ( short ) decrypted.length );
+        dig.doFinal( new byte[]{ 0x41, 0x55, 0x54, 0x48}, (short)0, (short)4, digest, (short)0 );
+
+        byte[] signed = new byte[ 256 ];
+        Signature signature = Signature.getInstance( Signature.ALG_RSA_SHA_PKCS1, false );
+        signature.init( sharedPrivateKey, Signature.MODE_SIGN );
+        short len = signature.sign( digest, (short)0, (short)digest.length, signed, (short)0 );
 
         cipher.init( aesKey, Cipher.MODE_ENCRYPT );
 
+        short certLen = (short)(((sharedCert.length / (short)16) + (short)1) * (short)16);
+        byte[] tempBuffer = JCSystem.makeTransientByteArray( certLen, JCSystem.CLEAR_ON_RESET );
+        Util.arrayCopy( sharedCert, (short)0, tempBuffer, (short)0, (short)sharedCert.length );
 
+        short off1 = cipher.update( tempBuffer, (short)0, certLen, transientOutBuffer, (short)2 );
+        short off2 = cipher.doFinal( signed, (short)0, (short)signed.length, transientOutBuffer, (short)(off1 + (short)2) );
 
-        byte[] output = new byte[ 128 ];
-        cipher.doFinal( digest, ( short ) 0, ( short ) 128, output, ( short ) 0 );
+        short off = (short)(off1 + off2);
+
+        transientOutBuffer[(short)0] = (byte) (off & 0xFF);
+        transientOutBuffer[(short)1] = (byte) ((off >> 8) & 0xFF);
 
         apdu.setOutgoing();
-        apdu.setOutgoingLength( ( short ) output.length );
-        apdu.sendBytesLong( output, ( short ) 0, ( short ) output.length );
+        apdu.setOutgoingLength( ( short ) 1 );
+        apdu.sendBytesLong( new byte[]{ 0 }, ( short ) 0, ( short )1 );
     }
 
 

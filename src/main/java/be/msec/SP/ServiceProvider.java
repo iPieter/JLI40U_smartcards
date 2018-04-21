@@ -15,14 +15,20 @@ import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import java.io.*;
+import java.math.BigInteger;
 import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.RSAPublicKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
 
 /**
  * @author Pieter
  * @version 1.0
+ *
+ * Start the docker container with: docker run -p 1883:1883 -p 15671:15671 -p 15672:15672 -p 15674:15674 -p 5672:5672 -p 8883:8883 -p 61613:61613 rmq
  */
 public class ServiceProvider
 {
@@ -146,10 +152,31 @@ public class ServiceProvider
 
             byte[] response = ((ByteArray) is.readObject()).getChallenge();
 
-
             log( "Received hash. Now decrypting" );
             encryptCypher.init( Cipher.DECRYPT_MODE, key, spec );
-            byte decryptedResponse[] = encryptCypher.doFinal( response, 0, 128 );
+            short size = getEncodedSize( response );
+            byte decryptedResponse[] = encryptCypher.doFinal( response, 2, size );
+
+            SSLUtil.createKeyStore( "CA.jks", "password" );
+
+            RSAPublicKey publicKey = (RSAPublicKey ) SSLUtil.getPublicKey( "CA" );
+            Signature signature = Signature.getInstance( "SHA1withRSA" );
+            signature.initVerify( publicKey );
+
+            signature.update(  decryptedResponse, 0, 545 - 256 );
+            boolean isValidCertificate = signature.verify( decryptedResponse, 545 - 256, 256 );
+
+            BigInteger exp = new BigInteger( new byte[]{1,0,1} );
+            byte[] mod = Arrays.copyOfRange( decryptedResponse, (545 - 256 - 256), 545 - 256 );
+            BigInteger modulus = new BigInteger( 1, mod );
+            RSAPublicKeySpec smartCardKey = new RSAPublicKeySpec( modulus, exp );
+            publicKey = (RSAPublicKey) KeyFactory.getInstance( "RSA" ).generatePublic( smartCardKey );
+            signature = Signature.getInstance( "SHA1withRSA" );
+            signature.initVerify( publicKey );
+
+
+
+            boolean isValidChallenge = signature.verify( decryptedResponse, 560, 256 );
 
             boolean equals = Arrays.equals( decryptedResponse, digest );
 
