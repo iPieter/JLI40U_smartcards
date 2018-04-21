@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -12,7 +13,6 @@ import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
-import java.util.Arrays;
 
 /**
  * Provides utility methods to write, read and construct a SSL tunnel to a SSL Socket server.
@@ -72,35 +72,42 @@ public class SSLClient
     public void writeObject( Object object )
     {
         assert object != null;
-        assert socket.isConnected();
-        assert os != null;
-
-        try
+        if ( socket != null && socket.isConnected() && os != null )
         {
-            os.writeObject( object );
-        }
-        catch ( IOException e )
-        {
-            e.printStackTrace();
+            try
+            {
+                os.writeObject( object );
+            }
+            catch ( IOException e )
+            {
+                e.printStackTrace();
+            }
         }
     }
 
     public Object receiveObject()
     {
-        assert socket.isConnected();
-        assert is != null;
+        if ( socket != null && socket.isConnected() && is != null )
+        {
 
-        try
-        {
-            return is.readObject();
-        }
-        catch ( IOException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( ClassNotFoundException e )
-        {
-            e.printStackTrace();
+            try
+            {
+                return is.readObject();
+            }
+            catch ( EOFException e )
+            {
+                socket = null;
+                LOGGER.warn( "Connection terminated by server, exiting" );
+                System.exit( 0 );
+            }
+            catch ( IOException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( ClassNotFoundException e )
+            {
+                e.printStackTrace();
+            }
         }
         return null;
     }
@@ -123,6 +130,6 @@ public class SSLClient
 
     public boolean isAvailiable()
     {
-        return  socket.isConnected();
+        return socket.isConnected();
     }
 }

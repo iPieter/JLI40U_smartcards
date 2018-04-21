@@ -378,6 +378,9 @@ public class ServiceProvider
 
         }
 
+        log( "End session, clearing symmetric key and closing connection" );
+        symmetricKey = null;
+        close();
     }
 
     private void log( String event )
