@@ -2,11 +2,12 @@ package be.msec.SP;
 
 import be.msec.SSLUtil;
 import com.rabbitmq.client.*;
+import javacard.security.InitializedMessageDigest;
+import javacard.security.MessageDigest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
+import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLContext;
@@ -17,9 +18,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.cert.Certificate;
+import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
 import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
@@ -38,54 +37,126 @@ public class ServiceProvider
     private ObjectInputStream  is;
     private ObjectOutputStream os;
 
+    private boolean headlessMode = false;
+
     private SSLSocket c;
+
+    private byte[] symmetricKey;
 
     public static void main( String[] args )
     {
         ServiceProvider serviceProvider = new ServiceProvider();
 
+        try
+        {
+            serviceProvider.initAMQP();
+        }
+        catch ( IOException | TimeoutException e )
+        {
+            LOGGER.info( "starting headless" );
+            serviceProvider.setHeadlessMode( true );
+        }
+        finally
+        {
+            serviceProvider.startSSLServer();
+            serviceProvider.close();
 
-        serviceProvider.initAMQP();
-        serviceProvider.startSSLServer();
-        serviceProvider.close();
+        }
     }
 
-    private void initAMQP()
+    private void initAMQP() throws IOException, TimeoutException
     {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost( "localhost" );
         factory.setPort( 5672 );
-        connection = null;
+
+        LOGGER.info( "Created factory" );
+
+        connection = factory.newConnection();
+        LOGGER.info( "Connected" );
+        channel = connection.createChannel();
+        channel.exchangeDeclare( "amq.topic", BuiltinExchangeType.TOPIC, true );
+
+        Consumer consumer = new DefaultConsumer( channel )
+        {
+            @Override
+            public void handleDelivery( String consumerTag, Envelope envelope,
+                                        AMQP.BasicProperties properties, byte[] body )
+                    throws IOException
+            {
+                String message = new String( body, "UTF-8" );
+                if ( c != null && c.isConnected() )
+                {
+                    log( "Received '" + message + "', sending certificate" );
+                    //step 1
+                    sendCertificate( message );
+
+                    //step 2
+                    respondChallenge( message );
+
+                    //step 3
+                    sendChallenge( message );
+
+                    //step 4
+                    requestPersonalInformation();
+                }
+                else
+                {
+                    log( "Received " + message + ", but no socket connection. Message will be ignored." );
+                }
+                channel.basicAck( envelope.getDeliveryTag(), true );
+
+            }
+        };
+
+        channel.basicConsume( "sp", consumer );
+        LOGGER.info( "created consumer for channel sp." );
+    }
+
+    private void sendChallenge( String message )
+    {
         try
         {
-            connection = factory.newConnection();
-            channel = connection.createChannel();
+            log( "Step 3: generating own challenge" );
+            byte[] challenge = new byte[16]; // TODO: IF TESTED, USE SECURE RANDOM
 
-            channel.exchangeDeclare( "amq.topic", BuiltinExchangeType.TOPIC, true );
+            for (int i = 0; i < challenge.length; i++)
+                challenge[i] = (byte) i;
 
-            Consumer consumer = new DefaultConsumer( channel )
-            {
-                @Override
-                public void handleDelivery( String consumerTag, Envelope envelope,
-                                            AMQP.BasicProperties properties, byte[] body )
-                        throws IOException
-                {
-                    String message = new String( body, "UTF-8" );
-                    LOGGER.info( "Received '{}', sending certificate", message );
-                    sendCertificate( message );
-                    sendChallenge( message );
-                    channel.basicAck( envelope.getDeliveryTag(), true );
+            //generate hash for validation
+            byte[]                   digest = new byte[128];
+            InitializedMessageDigest dig    = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
+            dig.doFinal( challenge, (short) 0, (short) challenge.length, digest, (short) 0 );
 
-                }
-            };
+            //encrypt that shit
+            SecretKey key = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
 
-            channel.basicConsume( "sp", consumer );
+            Cipher          encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
+            byte[]          ivdata        = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            IvParameterSpec spec          = new IvParameterSpec( ivdata );
+            encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
+
+            byte encryptedChallenge[] = encryptCypher.doFinal( challenge, 0, 16 );
+
+            log( "Encrypted challenge, now sending to middleware" );
+
+            os.writeObject( new ByteArray( encryptedChallenge ) );
+
+            log( "Sent challenge, awaiting response" );
+
+            byte[] response = ((ByteArray) is.readObject()).getChallenge();
+
+
+            log( "Received hash. Now decrypting" );
+            encryptCypher.init( Cipher.DECRYPT_MODE, key, spec );
+            byte decryptedResponse[] = encryptCypher.doFinal( response, 0, 128 );
+
+            boolean equals = Arrays.equals( decryptedResponse, digest );
+
+            log( "Response is " + (equals ? "expected" : "unexpected.") );
+
         }
-        catch ( IOException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( TimeoutException e )
+        catch ( Exception e )
         {
             e.printStackTrace();
         }
@@ -109,7 +180,6 @@ public class ServiceProvider
             //Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
 
-
             while ( true )
             {
                 c = (SSLSocket) s.accept();
@@ -120,8 +190,23 @@ public class ServiceProvider
 
                 LOGGER.info( "Opened ssl stream" );
 
-                channel.basicPublish( "amq.topic", "card", null, new Card("test").generateJsonRepresentation() );
+                if ( headlessMode )
+                {
+                    String message = "DEFAULT1";
+                    LOGGER.info( "No broker, using {} as service provider.", message );
 
+                    //step 1
+                    sendCertificate( message );
+
+                    //step 2
+                    respondChallenge( message );
+
+                    //step 3
+                    sendChallenge( message );
+
+                    //step 4
+                    requestPersonalInformation();
+                }
             }
 
 
@@ -137,26 +222,28 @@ public class ServiceProvider
         try
         {
 
-            FileInputStream fis         = new FileInputStream( "cert_" + identifier +".bob" );
-            int              currentByte = 0;
-            int              idx         = 0;
-            byte[]           tmp         = new byte[1000];
+            FileInputStream fis         = new FileInputStream( "cert_" + identifier + ".bob" );
+            int             currentByte = 0;
+            int             idx         = 0;
+            byte[]          tmp         = new byte[1000];
 
             while ( (currentByte = fis.read()) != -1 )
-                tmp[idx++] = (byte)currentByte;
+                tmp[idx++] = (byte) currentByte;
 
-            byte[] buffer = new byte[ idx + 2 ];
+            byte[] buffer = new byte[idx + 2];
 
             int certSize = idx - 256;
 
-            buffer[0] = (byte)(certSize & 0xFF );
-            buffer[1] = (byte)((certSize >> 8) & 0xFF );
+            buffer[0] = (byte) (certSize & 0xFF);
+            buffer[1] = (byte) ((certSize >> 8) & 0xFF);
 
-            for( int i = 0; i < idx; i++ )
+            for (int i = 0; i < idx; i++)
                 buffer[i + 2] = tmp[i];
 
+            System.out.println( Arrays.asList( buffer ) );
+
             os.writeObject( new ByteArray( buffer ) );
-            LOGGER.info( "Sending certificate {} to Middleware", identifier );
+            log( "Sending certificate " + identifier + " to Middleware" );
         }
         catch ( Exception e )
         {
@@ -164,13 +251,13 @@ public class ServiceProvider
         }
     }
 
-    private void sendChallenge( String identifier )
+    private void respondChallenge( String identifier )
     {
         try
         {
-            LOGGER.info( "Waiting for challenge" );
+            log( "Waiting for challenge" );
             byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
-            LOGGER.info( "Received challenge" );
+            log( "Received challenge" );
 
             SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
 
@@ -180,6 +267,8 @@ public class ServiceProvider
             rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
 
             byte[] symmKey = rsaCipher.doFinal( responseBuffer, 0, 256 );
+
+            symmetricKey = symmKey;
 
             System.out.println( Arrays.toString( symmKey ) );
 
@@ -198,7 +287,7 @@ public class ServiceProvider
             encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
             byte newChallenge[] = encryptCypher.doFinal( result, 0, 16 );
 
-            LOGGER.info( "Wrote newChallenge" );
+            log( "Wrote newChallenge" );
             os.writeObject( new ByteArray( newChallenge ) );
         }
         catch ( Exception e )
@@ -207,13 +296,120 @@ public class ServiceProvider
         }
     }
 
+    private short getEncodedSize( byte[] buffer )
+    {
+        return (short) ((short) ((buffer[1] & 0xff) << 8) | ((short) buffer[0] & 0xff));
+    }
+
+    private void requestPersonalInformation()
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            //ByteArray mask = (ByteArray) serviceProvider.receiveObject();
+
+            byte[] mask = new byte[]{ (byte) (1 << i) };
+
+            try
+            {
+                os.writeObject( new ByteArray( mask ) );
+
+
+                SecretKey       key    = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
+                byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                IvParameterSpec spec   = new IvParameterSpec( ivdata );
+                Cipher          cipher = Cipher.getInstance( "AES/CBC/NoPadding" );
+                cipher.init( Cipher.DECRYPT_MODE, key, spec );
+
+                byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
+                if ( responseBuffer.length > 0 )
+                {
+                    byte result[] = cipher.doFinal( responseBuffer, 2, responseBuffer.length - 2 );
+
+                    log( "received info for " + i );
+
+                    if ( channel != null )
+                        channel.basicPublish( "amq.topic", "data", null,
+                                new IdentityInformation( Arrays.copyOfRange( result, 0, getEncodedSize( responseBuffer ) ), mask[0] ).generateJsonRepresentation() );
+
+                }
+                else
+                {
+                    log( "invalid request for data " + i );
+
+                    if ( channel != null )
+                        channel.basicPublish( "amq.topic", "data", null,
+                                new IdentityInformation( mask[0] ).generateJsonRepresentation() );
+
+                }
+
+            }
+            catch ( IOException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( NoSuchAlgorithmException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( InvalidKeyException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( InvalidAlgorithmParameterException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( NoSuchPaddingException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( BadPaddingException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( ClassNotFoundException e )
+            {
+                e.printStackTrace();
+            }
+            catch ( IllegalBlockSizeException e )
+            {
+                e.printStackTrace();
+            }
+
+        }
+
+        log( "End session, clearing symmetric key and closing connection" );
+        symmetricKey = null;
+        close();
+    }
+
+    private void log( String event )
+    {
+        LOGGER.info( event );
+        try
+        {
+            if ( channel != null )
+                channel.basicPublish( "amq.topic", "card", null,
+                        new Event( Event.Level.SUCCESS, event ).generateJsonRepresentation() );
+        }
+        catch ( IOException e )
+        {
+            e.printStackTrace();
+        }
+
+    }
+
 
     private void close()
     {
         try
         {
-            channel.close();
-            connection.close();
+            if ( channel != null )
+                channel.close();
+
+            if ( connection != null )
+                connection.close();
+
             is.close();
             os.close();
             c.close();
@@ -227,5 +423,15 @@ public class ServiceProvider
         {
             e.printStackTrace();
         }
+    }
+
+    public boolean isHeadlessMode()
+    {
+        return headlessMode;
+    }
+
+    public void setHeadlessMode( boolean headlessMode )
+    {
+        this.headlessMode = headlessMode;
     }
 }

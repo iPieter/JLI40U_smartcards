@@ -40,7 +40,7 @@ public class Controller
     @FXML
     public void initialize()
     {
-        //serviceProvider = new SSLClient( "127.0.0.1", 1271 );
+        serviceProvider = new SSLClient( "127.0.0.1", 1271 );
 
         simulator = new Simulator();
 
@@ -80,6 +80,8 @@ public class Controller
 
         commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00  );
         response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+        System.out.println( Arrays.toString(response.getData()));
 
         write( "Correct signature: " + (response.getData()[0] == 0) + " statuscode:" + response.getData()[0] );
 
@@ -138,7 +140,9 @@ public class Controller
 
         try
         {
-            write( "Sending challenge" );
+            // STEP 2 ----------
+
+            write( "Step 2: sending challenge" );
 
             serviceProvider.writeObject( new ByteArray( responseBuffer ) );
 
@@ -176,19 +180,57 @@ public class Controller
 
             ByteArray byteArray = (ByteArray) serviceProvider.receiveObject();
 
-            write( "Received new challenge" );
+            write( "Received challenge response" );
 
             commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
             response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
             write( response.toString() );
-            write( "Response on challenge: " + response.getData()[0] );
+            write( "Validation challenge: " + response.getData()[0] );
 
+            // STEP 3 ----------
+            byteArray = (ByteArray) serviceProvider.receiveObject();
+
+            write( "Step 3: received challenge" );
+            commandAPDU = new CommandAPDU( 0x80, 0x60, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
+            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+            System.out.println( Arrays.toString(response.getData()));
+
+            serviceProvider.writeObject( new ByteArray( response.getData() ) );
+
+            write("Sent response to challenge.");
             /*
             write( Arrays.toString( result ) );
             System.out.println( Arrays.toString( result ) );
             System.out.println( Arrays.toString( response.getData() ) );
             */
+
+            //STEP 4 until the world ends
+            while ( serviceProvider.isAvailiable() )
+            {
+                ByteArray mask = (ByteArray) serviceProvider.receiveObject();
+
+                commandAPDU = new CommandAPDU( 0x80, 0x70, 0x00, 0x00, new byte[]{ 0x01, 0x02, 0x03, 0x04, mask.getChallenge()[0]} );
+                response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+                System.out.println(Arrays.toString( response.getData()));
+
+                //TODO
+                //1 wrong pin
+                //2 not authenticated
+                //3 no permission
+                if ( response.getData()[0] == 0x00) {
+                    byte[] personalInformation = readTransientBuffer();
+                    System.out.println( Arrays.toString(personalInformation));
+                    serviceProvider.writeObject( new ByteArray( personalInformation ) );
+                } else
+                {
+                    serviceProvider.writeObject( new ByteArray( new byte[0] ) );
+                }
+
+
+
+            }
         }
         catch ( Exception e )
         {
@@ -249,6 +291,36 @@ public class Controller
 
         write( "Buffer ready" );
 
+    }
+
+    /**
+     * Reads the data on the transient buffer of the smart card
+     *
+     * @return A byte array with all the data.
+     */
+    public byte[] readTransientBuffer()
+    {
+        byte[] responseBuffer = new byte[1024];
+
+        for (int i = 0; i < 4; i++)
+        {
+            CommandAPDU commandAPDU = new CommandAPDU( 0x80, 0x32, 0x00, 0x00, new byte[]{ (byte) i } );
+            ResponseAPDU response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+            for (int j = 0; j < response.getData().length; j++)
+                responseBuffer[i * 240 + j] = response.getData()[j];
+        }
+
+        int size = getEncodedSize( responseBuffer );
+
+        byte[] shortened = Arrays.copyOfRange(responseBuffer, 0, 16 * (size / 16 + 1) + 2 );
+
+        return shortened;
+    }
+
+    private short getEncodedSize(byte[] buffer)
+    {
+        return ( short ) ( ( short ) ( ( buffer[ 1 ] & 0xff ) << 8 ) | ( ( short ) buffer[ 0 ] & 0xff ) );
     }
 
 

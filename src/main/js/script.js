@@ -1,10 +1,11 @@
 var app = new Vue({
     el: '#app',
     data: {
-        cards: {},
+        cards: [],
         connected: false,
         ip: "127.0.0.1:15674",
         spValue: 'GOV1',
+        data: [],
     },
     methods: {
         reconnect: function (event) {
@@ -19,6 +20,13 @@ var app = new Vue({
         setSP: function (data) {
             client.send("sp", null, data);
             app.spValue = data;
+        },
+        removePadding: function(string) {
+            var index = 0;
+            while (string[index++] === '0') {
+            }
+
+            return string.substring(index - 1, string.length);
         }
     }
 });
@@ -32,6 +40,7 @@ var on_connect = function () {
     app.connected = true;
 
     cards = subscribeToQueue("/exchange/amq.topic/card", app.cards);
+    data = subscribeToQueue("/exchange/amq.topic/data", app.data);
     //symptoms = subscribeToQueueWithoutFilter( "/exchange/stats/symptom.*", app.symptoms);
     //diagnoses = subscribeToQueueWithoutFilter( "/exchange/stats/diagnosis.*", app.diagnoses);
 };
@@ -44,7 +53,8 @@ var on_error = function () {
 function subscribeToQueue(name, dict) {
     return client.subscribe(name, function (d) {
         let json = JSON.parse(d.body);
-        Vue.set(dict, json.key, json)
+        dict.unshift(json);
+        //Vue.set(dict, d, json)
     });
 }
 

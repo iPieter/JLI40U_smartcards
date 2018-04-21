@@ -44,15 +44,12 @@ public class Main
 
             SSLServerSocketFactory ssf = context.getServerSocketFactory();
             SSLServerSocket        s   = (SSLServerSocket) ssf.createServerSocket( 1207 );
-            //Arrays.stream( s.getEnabledCipherSuites() ).forEach( System.out::println );
 
             LOGGER.info( "Listening for connection" );
 
             while ( true )
             {
                 SSLSocket c = (SSLSocket) s.accept();
-
-                LOGGER.info( "Connection: " + Arrays.toString( c.getEnabledProtocols() ) );
 
                 //DataInputStream is = new DataInputStream( c.getInputStream() );
                 ObjectOutputStream os = new ObjectOutputStream( c.getOutputStream() );

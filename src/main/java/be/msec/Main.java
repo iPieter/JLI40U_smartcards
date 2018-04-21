@@ -12,6 +12,7 @@ import javax.net.ssl.SSLSocket;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.*;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
 
@@ -38,11 +39,12 @@ public class Main extends Application
             {
                 SSLContext context = SSLUtil.createClientSSLContext( "CA.jks", "password" );
 
-                socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1271 );
+                //socket = (SSLSocket) context.getSocketFactory().createSocket( "127.0.0.1", 1271 );
                 //socket.setEnabledCipherSuites( enabledCipherSuites );
 
                 //Arrays.stream( socket.getEnabledCipherSuites() ).forEach( System.out::println );
 
+                /*
                 ObjectOutputStream os = new ObjectOutputStream( socket.getOutputStream() );
                 ObjectInputStream  is = new ObjectInputStream( socket.getInputStream() );
 
@@ -55,11 +57,37 @@ public class Main extends Application
                 os.close();
                 is.close();
                 socket.close();
+                */
 
-                SSLUtil.createKeyStore( "TIME_keys.jks", "password" );
+                FileInputStream fis         = new FileInputStream( "vincentje.jpeg" );
+                int              currentByte = 0;
+                int              idx         = 0;
+                byte[]           tmp         = new byte[1000];
+
+                while ( (currentByte = fis.read()) != -1 )
+                    tmp[idx++] = (byte)currentByte;
+
+                byte[] buffer = new byte[ idx + 2 ];
+
+                int certSize = idx - 256;
+
+                buffer[0] = (byte)(idx & 0xFF );
+                buffer[1] = (byte)((idx >> 8) & 0xFF );
+
+                for( int i = 0; i < idx; i++ )
+                    buffer[i + 2] = tmp[i];
+
+                System.out.println( Arrays.toString( buffer ) );
+                System.out.println( buffer.length );
+                SSLUtil.createKeyStore( "SMARTCARD_keys.jks", "password" );
 
 
-                RSAPublicKey key = (RSAPublicKey ) SSLUtil.getPublicKey( "TIME" );
+                RSAPublicKey  key = (RSAPublicKey ) SSLUtil.getPublicKey( "SMARTCARD" );
+                RSAPrivateKey privateKey =  (RSAPrivateKey ) SSLUtil.getPrivateKey( "SMARTCARD" );
+
+                System.out.println( Arrays.toString( privateKey.getPrivateExponent().toByteArray() ) );
+                System.out.println( Arrays.toString( privateKey.getModulus().toByteArray() ) );
+
                 System.out.println( Arrays.toString( key.getPublicExponent().toByteArray() ) );
                 System.out.println( Arrays.toString( key.getModulus().toByteArray() ) );
 
