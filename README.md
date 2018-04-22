@@ -9,10 +9,18 @@ There are keys included in this project by default but if you want to generate y
 
 Make sure to copy the keys into `IdentityCard.java`, because those have to be hardcoded.
 
+```
+$java -cp smartcard.jar be.msec.certificates.GeneratorMain
+```
+
 ### Time server `G`
 Launch `timestamp/Main.java` It will start a SSL Socket server with the key store `TIME_keys.jks`.
 
 After launch, it will sequentially accept new connections until terminated.
+
+```
+$java -cp smartcard.jar be.msec.timestamp.Main
+```
 
 ### Service provider `SP`
 The service provider has two operation modes:
@@ -47,6 +55,21 @@ docker run -p 1883:1883 -p 15671:15671 -p 15672:15672 -p 15674:15674 -p 5672:567
 ```
 
 After this, you can start `ServiceProvider.java` and open `index.html` as a regular file in your favorite browser. _Not like some other smart card services which require some version of some ancient browser._
+
+Or from a jar:
+
+```
+$java -cp smartcard.jar be.msec.SP.ServiceProvider
+```
+
+### Running the Middleware
+Finally you can launch the middleware by calling `be.msec.Main.java`.
+
+Or from a jar:
+
+```
+$java -cp smartcard.jar be.msec.Main
+```
 
 ## Building applets
 
