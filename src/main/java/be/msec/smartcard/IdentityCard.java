@@ -365,7 +365,6 @@ public class IdentityCard extends Applet
 
         byte[] encryptedChallenge = JCSystem.makeTransientByteArray( ( short ) 64, JCSystem.CLEAR_ON_RESET );
 
-        // TODO: IF TESTED, USE SECURE RANDOM
         short off = cipher.update( challenge, ( short ) 0, ( short ) 16, encryptedChallenge, ( short ) 0 );
         cipher.doFinal( transientInBuffer, ( short ) 0, ( short ) 16, encryptedChallenge, off ); //Subject
 
