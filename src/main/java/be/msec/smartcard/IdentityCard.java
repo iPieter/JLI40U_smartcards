@@ -413,7 +413,7 @@ public class IdentityCard extends Applet
         }
         byte buffer[] = apdu.getBuffer();
 
-        Cipher cipher = Cipher.getInstance( Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false );
+        Cipher cipher = Cipher. getInstance( Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false );
 
         cipher.init( aesKey, Cipher.MODE_DECRYPT );
 

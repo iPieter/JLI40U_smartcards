@@ -255,9 +255,9 @@ public class ServiceProvider
     {
         try
         {
-            log( "Waiting for challenge" );
+            log( "Waiting for symmetric key and challenge" );
             byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
-            log( "Received challenge" );
+            log( "Received symmetric key and challenge (encrypted)" );
 
             SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
 
@@ -270,7 +270,7 @@ public class ServiceProvider
 
             symmetricKey = symmKey;
 
-            System.out.println( Arrays.toString( symmKey ) );
+            log( "Decrypted symmetric key" );
 
             SecretKey       key    = new SecretKeySpec( symmKey, 0, 16, "AES" );
             byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -283,11 +283,13 @@ public class ServiceProvider
             for (int i = 0; i < result.length; i++)
                 result[i] += (byte) 1;
 
+            log( "Decrypted challenge and increased each byte with 1" );
+
             Cipher encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
             encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
             byte newChallenge[] = encryptCypher.doFinal( result, 0, 16 );
 
-            log( "Wrote newChallenge" );
+            log( "Wrote challenge" );
             os.writeObject( new ByteArray( newChallenge ) );
         }
         catch ( Exception e )
