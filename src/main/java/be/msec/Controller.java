@@ -15,9 +15,10 @@ import javafx.scene.control.TextInputDialog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.smartcardio.CommandAPDU;
-import javax.smartcardio.ResponseAPDU;
+import javax.smartcardio.*;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -34,6 +35,8 @@ public class Controller implements Runnable
 
     private Simulator simulator;
 
+    //private CardChannel channel;
+
     private SSLClient serviceProvider;
 
     public Controller()
@@ -41,8 +44,10 @@ public class Controller implements Runnable
     }
 
     @FXML
-    public void initialize()
+    public void initialize() throws CardException
     {
+
+
         simulator = new Simulator();
 
         AID appletAID = AIDUtil.create( "F000000001" );
@@ -50,7 +55,23 @@ public class Controller implements Runnable
 
         simulator.selectApplet( appletAID );
 
-        write( "Simulator loaded." );
+
+        /*
+        // show the list of available terminals
+        TerminalFactory    factory   = TerminalFactory.getDefault();
+        List<CardTerminal> terminals = factory.terminals().list();
+        System.out.println("Terminals: " + terminals);
+        // get the first terminal
+        CardTerminal terminal = terminals.get(0);
+        // establish a connection with the card
+        Card card = terminal.connect("T=0");
+        System.out.println("card: " + card);
+        channel = card.getBasicChannel();
+        */
+
+        System.out.println(new Date());
+
+        write( "Card loaded." );
 
         CommandAPDU  commandAPDU;
         ResponseAPDU response;
@@ -65,7 +86,7 @@ public class Controller implements Runnable
         write( "Testing time" );
 
         commandAPDU = new CommandAPDU( 0x80, 0x26, 0x00, 0x00, time );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        response =  transmit( commandAPDU );
 
         write( "Time needs update = " + Arrays.toString( response.getData() ) );
 
@@ -79,8 +100,9 @@ public class Controller implements Runnable
 
         write( "Updating and verifying signed timestamp" );
 
+
         commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00 );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        response = transmit( commandAPDU );
 
         System.out.println( Arrays.toString( response.getData() ) );
 
@@ -106,7 +128,7 @@ public class Controller implements Runnable
         ResponseAPDU response;
 
         commandAPDU = new CommandAPDU( 0x80, 0x50, 0x00, 0x00 );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        response = transmit( commandAPDU );
 
         write( response.toString() );
 
@@ -115,7 +137,7 @@ public class Controller implements Runnable
         for ( int i = 0; i < 4; i++ )
         {
             commandAPDU = new CommandAPDU( 0x80, 0x32, 0x00, 0x00, new byte[]{ ( byte ) i } );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            response = transmit( commandAPDU );
 
             for ( int j = 0; j < response.getData().length; j++ )
                 responseBuffer[ i * 240 + j ] = response.getData()[ j ];
@@ -128,7 +150,7 @@ public class Controller implements Runnable
         write( "Received challenge response" );
 
         commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        response = transmit( commandAPDU );
 
         write( response.toString() );
         write( "Validation challenge: " + response.getData()[ 0 ] );
@@ -140,7 +162,7 @@ public class Controller implements Runnable
 
         write( "Step 3: received challenge" );
         commandAPDU = new CommandAPDU( 0x80, 0x60, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        response = transmit( commandAPDU );
 
         write( Arrays.toString(  response.getData() ) );
 
@@ -193,7 +215,7 @@ public class Controller implements Runnable
                 write( "PIN: " + i1 + "," + i2 + "," + i3 + "," + i4  );
 
                 commandAPDU = new CommandAPDU( 0x80, 0x70, 0x00, 0x00, new byte[]{ (byte)i1,(byte)i2,(byte)i3,(byte)i4, mask.getChallenge()[ 0 ] } );
-                response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+                response = transmit( commandAPDU );
                 System.out.println( Arrays.toString( response.getData() ) );
 
 
@@ -280,7 +302,7 @@ public class Controller implements Runnable
         write( "Clearing transient buffer" );
         // Clear buffer
         CommandAPDU  commandAPDU = new CommandAPDU( 0x80, 0x30, 0x00, 0x00 );
-        ResponseAPDU response    = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        ResponseAPDU response    = transmit( commandAPDU );
 
         write( "Buffer clear, filling with new data" );
 
@@ -294,7 +316,7 @@ public class Controller implements Runnable
                 currentBuffer[ j + 1 ] = buffer[ i * 240 + j ];
 
             commandAPDU = new CommandAPDU( 0x80, 0x31, 0x00, 0x00, currentBuffer );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            response = transmit( commandAPDU );
 
             iterations++;
         }
@@ -309,7 +331,7 @@ public class Controller implements Runnable
                 currentBuffer[ j + 1 ] = buffer[ iterations * 240 + j ];
 
             commandAPDU = new CommandAPDU( 0x80, 0x31, 0x00, 0x00, currentBuffer );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            response = transmit( commandAPDU );
         }
 
         write( "Buffer ready" );
@@ -328,7 +350,7 @@ public class Controller implements Runnable
         for ( int i = 0; i < 4; i++ )
         {
             CommandAPDU  commandAPDU = new CommandAPDU( 0x80, 0x32, 0x00, 0x00, new byte[]{ ( byte ) i } );
-            ResponseAPDU response    = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            ResponseAPDU response    = transmit( commandAPDU );
 
             for ( int j = 0; j < response.getData().length; j++ )
                 responseBuffer[ i * 240 + j ] = response.getData()[ j ];
@@ -373,5 +395,24 @@ public class Controller implements Runnable
     public void login()
     {
         logPanel.appendText( "Logging in \n" );
+    }
+
+    private ResponseAPDU transmit(CommandAPDU commandAPDU)
+    {
+         return new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+        /*
+        try
+        {
+            return channel.transmit( commandAPDU );
+        }
+        catch ( CardException e )
+        {
+            LOGGER.error( "Could not transmit. {}", e.getMessage() );
+            e.printStackTrace();
+        }
+
+        return null;
+        */
     }
 }
