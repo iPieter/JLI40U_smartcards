@@ -41,7 +41,7 @@ public class ServiceProvider
     private ObjectInputStream  is;
     private ObjectOutputStream os;
 
-    private boolean headlessMode = false;
+    private boolean headlessMode = true;
 
     private SSLSocket c;
 
@@ -129,8 +129,8 @@ public class ServiceProvider
 
             //generate hash for validation
             MessageDigest dig = MessageDigest.getInstance( "SHA-256" );
-            dig.digest( challenge );
-            dig.digest( new byte[]{ 0x41, 0x55, 0x54, 0x48} );
+            dig.update( challenge );
+            dig.update( new byte[]{ 0x41, 0x55, 0x54, 0x48} );
             byte[] digest = dig.digest();
 
             //encrypt that shit
@@ -176,10 +176,8 @@ public class ServiceProvider
             signature.update( digest );
             boolean isValidChallenge = signature.verify( decryptedResponse, 560, 256 );
 
-            boolean equals = Arrays.equals( decryptedResponse, digest );
-
-            log( "Response is " + (equals ? "expected" : "unexpected.") );
-
+            log( "Is valid common certificate: " + isValidCertificate );
+            log( "Is valid decrypted and signed hash: " + isValidChallenge );
         }
         catch ( Exception e )
         {
