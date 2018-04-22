@@ -2,8 +2,6 @@ package be.msec.SP;
 
 import be.msec.SSLUtil;
 import com.rabbitmq.client.*;
-import javacard.security.InitializedMessageDigest;
-import javacard.security.MessageDigest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,9 +128,10 @@ public class ServiceProvider
                 challenge[i] = (byte) i;
 
             //generate hash for validation
-            byte[]                   digest = new byte[128];
-            InitializedMessageDigest dig    = MessageDigest.getInitializedMessageDigestInstance( MessageDigest.ALG_SHA_256, false );
-            dig.doFinal( challenge, (short) 0, (short) challenge.length, digest, (short) 0 );
+            MessageDigest dig = MessageDigest.getInstance( "SHA-256" );
+            dig.digest( challenge );
+            dig.digest( new byte[]{ 0x41, 0x55, 0x54, 0x48} );
+            byte[] digest = dig.digest();
 
             //encrypt that shit
             SecretKey key = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
@@ -174,8 +173,7 @@ public class ServiceProvider
             signature = Signature.getInstance( "SHA1withRSA" );
             signature.initVerify( publicKey );
 
-
-
+            signature.update( digest );
             boolean isValidChallenge = signature.verify( decryptedResponse, 560, 256 );
 
             boolean equals = Arrays.equals( decryptedResponse, digest );

@@ -34,7 +34,7 @@ public class Main extends Application
 
     public static void main( String[] args )
     {
-        boolean PRINT_SHITTY_KEY = false;
+        boolean PRINT_SHITTY_KEY = true;
 
         if ( PRINT_SHITTY_KEY )
         {
