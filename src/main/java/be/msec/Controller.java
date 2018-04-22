@@ -196,17 +196,14 @@ public class Controller implements Runnable
                 response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
                 System.out.println( Arrays.toString( response.getData() ) );
 
-                //TODO
-                //1 wrong pin
-                //2 not authenticated
-                //3 no permission
+
                 if ( response.getData()[ 0 ] == 0x00 )
                 {
                     byte[] personalInformation = readTransientBuffer();
                     int size = getEncodedSize( personalInformation );
                     byte[] shortened = Arrays.copyOfRange( personalInformation, 0, 16 * ( size / 16 + 1 ) + 2 );
                     System.out.println( Arrays.toString( personalInformation ) );
-                    serviceProvider.writeObject( new ByteArray( personalInformation ) );
+                    serviceProvider.writeObject( new ByteArray( shortened ) );
                 }
                 else
                 {
@@ -215,7 +212,7 @@ public class Controller implements Runnable
             }
             else
             {
-                serviceProvider.writeObject( new ByteArray( new byte[] { 4 } ) );
+                serviceProvider.writeObject( new ByteArray( new byte[ 0 ] ) );
             }
 
             runLoop();

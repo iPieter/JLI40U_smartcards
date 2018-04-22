@@ -21,15 +21,14 @@ import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.concurrent.TimeoutException;
 
 /**
  * @author Pieter
  * @version 1.0
- *
- * Start the docker container with: docker run -p 1883:1883 -p 15671:15671 -p 15672:15672 -p 15674:15674 -p 5672:5672 -p 8883:8883 -p 61613:61613 rmq
+ *          <p>
+ *          Start the docker container with: docker run -p 1883:1883 -p 15671:15671 -p 15672:15672 -p 15674:15674 -p 5672:5672 -p 8883:8883 -p 61613:61613 rmq
  */
 public class ServiceProvider
 {
@@ -41,7 +40,7 @@ public class ServiceProvider
     private ObjectInputStream  is;
     private ObjectOutputStream os;
 
-    private boolean headlessMode = true;
+    private boolean headlessMode = false;
 
     private SSLSocket c;
 
@@ -130,7 +129,7 @@ public class ServiceProvider
             //generate hash for validation
             MessageDigest dig = MessageDigest.getInstance( "SHA-256" );
             dig.update( challenge );
-            dig.update( new byte[]{ 0x41, 0x55, 0x54, 0x48} );
+            dig.update( new byte[]{ 0x41, 0x55, 0x54, 0x48 } );
             byte[] digest = dig.digest();
 
             //encrypt that shit
@@ -153,21 +152,21 @@ public class ServiceProvider
 
             log( "Received hash. Now decrypting" );
             encryptCypher.init( Cipher.DECRYPT_MODE, key, spec );
-            short size = getEncodedSize( response );
-            byte decryptedResponse[] = encryptCypher.doFinal( response, 2, size );
+            short size                = getEncodedSize( response );
+            byte  decryptedResponse[] = encryptCypher.doFinal( response, 2, size );
 
             SSLUtil.createKeyStore( "CA.jks", "password" );
 
-            RSAPublicKey publicKey = (RSAPublicKey ) SSLUtil.getPublicKey( "CA" );
-            Signature signature = Signature.getInstance( "SHA1withRSA" );
+            RSAPublicKey publicKey = (RSAPublicKey) SSLUtil.getPublicKey( "CA" );
+            Signature    signature = Signature.getInstance( "SHA1withRSA" );
             signature.initVerify( publicKey );
 
-            signature.update(  decryptedResponse, 0, 545 - 256 );
+            signature.update( decryptedResponse, 0, 545 - 256 );
             boolean isValidCertificate = signature.verify( decryptedResponse, 545 - 256, 256 );
 
-            BigInteger exp = new BigInteger( new byte[]{1,0,1} );
-            byte[] mod = Arrays.copyOfRange( decryptedResponse, (545 - 256 - 256), 545 - 256 );
-            BigInteger modulus = new BigInteger( 1, mod );
+            BigInteger       exp          = new BigInteger( new byte[]{ 1, 0, 1 } );
+            byte[]           mod          = Arrays.copyOfRange( decryptedResponse, (545 - 256 - 256), 545 - 256 );
+            BigInteger       modulus      = new BigInteger( 1, mod );
             RSAPublicKeySpec smartCardKey = new RSAPublicKeySpec( modulus, exp );
             publicKey = (RSAPublicKey) KeyFactory.getInstance( "RSA" ).generatePublic( smartCardKey );
             signature = Signature.getInstance( "SHA1withRSA" );
@@ -408,6 +407,86 @@ public class ServiceProvider
         close();
     }
 
+    private void requestPersonalInformationForDefault()
+    {
+
+
+        byte[] mask = new byte[]{ (byte) (1 << 7)
+                | (byte) (1 << 2) };
+
+        try
+        {
+            os.writeObject( new ByteArray( mask ) );
+
+
+            SecretKey       key    = new SecretKeySpec( symmetricKey, 0, 16, "AES" );
+            byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+            IvParameterSpec spec   = new IvParameterSpec( ivdata );
+            Cipher          cipher = Cipher.getInstance( "AES/CBC/NoPadding" );
+            cipher.init( Cipher.DECRYPT_MODE, key, spec );
+
+            byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
+            if ( responseBuffer.length > 0 )
+            {
+                byte result[] = cipher.doFinal( responseBuffer, 2, responseBuffer.length - 2 );
+
+                log( "received info" );
+
+                if ( channel != null )
+                    channel.basicPublish( "amq.topic", "data", null,
+                            new IdentityInformation( Arrays.copyOfRange( result, 0, getEncodedSize( responseBuffer ) ), mask[0] ).generateJsonRepresentation() );
+
+            }
+            else
+            {
+                log( "invalid request for data" );
+
+                if ( channel != null )
+                    channel.basicPublish( "amq.topic", "data", null,
+                            new IdentityInformation( mask[0] ).generateJsonRepresentation() );
+
+            }
+
+        }
+        catch ( IOException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( NoSuchAlgorithmException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( InvalidKeyException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( InvalidAlgorithmParameterException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( NoSuchPaddingException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( BadPaddingException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( ClassNotFoundException e )
+        {
+            e.printStackTrace();
+        }
+        catch ( IllegalBlockSizeException e )
+        {
+            e.printStackTrace();
+        }
+
+
+        log( "End session, clearing symmetric key and closing connection" );
+        symmetricKey = null;
+        close();
+    }
+
     private void log( String event )
     {
         LOGGER.info( event );
@@ -429,22 +508,12 @@ public class ServiceProvider
     {
         try
         {
-            if ( channel != null )
-                channel.close();
-
-            if ( connection != null )
-                connection.close();
-
             is.close();
             os.close();
             c.close();
 
         }
         catch ( IOException e )
-        {
-            e.printStackTrace();
-        }
-        catch ( TimeoutException e )
         {
             e.printStackTrace();
         }
