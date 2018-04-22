@@ -2,6 +2,7 @@ package be.msec.SP;
 
 import be.msec.SSLUtil;
 import com.rabbitmq.client.*;
+import javacard.security.RandomData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,10 +122,10 @@ public class ServiceProvider
         try
         {
             log( "Step 3: generating own challenge" );
-            byte[] challenge = new byte[16]; // TODO: IF TESTED, USE SECURE RANDOM
+            byte[] challenge = new byte[16];
 
-            for (int i = 0; i < challenge.length; i++)
-                challenge[i] = (byte) i;
+            RandomData rnd = RandomData.getInstance( RandomData.ALG_SECURE_RANDOM );
+            rnd.generateData( challenge, ( short ) 0, ( short ) 16 );
 
             //generate hash for validation
             MessageDigest dig = MessageDigest.getInstance( "SHA-256" );
