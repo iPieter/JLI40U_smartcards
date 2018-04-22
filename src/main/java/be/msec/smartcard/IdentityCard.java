@@ -8,13 +8,8 @@ public class IdentityCard extends Applet
 {
     private final static byte IDENTITY_CARD_CLA = ( byte ) 0x80;
 
-    private static final byte VALIDATE_PIN_INS = 0x22;
-    private static final byte GET_SERIAL_INS   = 0x24;
-
     private static final byte SHOULD_UPDATE_TIME_INS = 0x26;
     private static final byte UPDATE_TIME_INS        = 0x27;
-
-    private static final byte TEST_SIGNATURE_INS = 0x28;
 
     private static final byte CLEAR_INPUT_BUFFER_INS  = 0x30;
     private static final byte UPDATE_INPUT_BUFFER_INS = 0x31;
@@ -22,9 +17,6 @@ public class IdentityCard extends Applet
 
     private final static byte PIN_TRY_LIMIT = ( byte ) 0x03;
     private final static byte PIN_SIZE      = ( byte ) 0x04;
-
-    private final static short SW_VERIFICATION_FAILED       = 0x6300;
-    private final static short SW_PIN_VERIFICATION_REQUIRED = 0x6301;
 
     private final static byte AUTHENTICATE_SP_INS   = 0x50;
     private final static byte CONFIRM_CHALLENGE_INS = 0x51;
@@ -34,7 +26,6 @@ public class IdentityCard extends Applet
     private final static byte ATTRIBUTE_QUERY_INS = 0x70;
 
 
-    private byte[] serial = new byte[]{ 0x30, 0x35, 0x37, 0x36, 0x39, 0x30, 0x31, 0x05 };
     private OwnerPIN pin;
 
     /**
@@ -191,20 +182,11 @@ public class IdentityCard extends Applet
         //A switch statement is used to select a method depending on the instruction
         switch ( buffer[ ISO7816.OFFSET_INS ] )
         {
-            case VALIDATE_PIN_INS:
-                validatePIN( apdu );
-                break;
-            case GET_SERIAL_INS:
-                getSerial( apdu );
-                break;
             case SHOULD_UPDATE_TIME_INS:
                 shouldUpdateTime( apdu );
                 break;
             case UPDATE_TIME_INS:
                 updateTime( apdu );
-                break;
-            case TEST_SIGNATURE_INS:
-                testSignature( apdu, timestampPublicKey, ( short ) 0, ( short ) 12, ( short ) 256 );
                 break;
             case CLEAR_INPUT_BUFFER_INS:
                 currentInBufferOffset = 0;
@@ -541,9 +523,8 @@ public class IdentityCard extends Applet
         }
         if( (byte)(request & AGE_BIT) != (byte) 0)
         {
-            byte[] age = new byte[1]; //TODO
-            Util.arrayCopy( age, (short)0, buffer, offset, (short) age.length );
-            offset = (short)(offset + birthDay.length);
+            Util.arrayCopy( birthDay, (short)0, buffer, offset, (short)4 );
+            offset = (short)(offset + (short)4);
         }
         if( (byte)(request & GENDER_BIT) != (byte) 0)
         {
@@ -573,41 +554,6 @@ public class IdentityCard extends Applet
                 return (byte)(CUSTOM_MASK | request) == CUSTOM_MASK;
             default:
                 return false;
-        }
-    }
-
-    /*
-     * This method is used to authenticate the owner of the card using a PIN code.
-     */
-    private void validatePIN( APDU apdu )
-    {
-        byte[] buffer = apdu.getBuffer();
-        if ( buffer[ ISO7816.OFFSET_LC ] == PIN_SIZE )
-        {
-            apdu.setIncomingAndReceive();
-            if ( !pin.check( buffer, ISO7816.OFFSET_CDATA, PIN_SIZE ) )
-                ISOException.throwIt( SW_VERIFICATION_FAILED );
-        }
-        else ISOException.throwIt( ISO7816.SW_WRONG_LENGTH );
-    }
-
-    /*
-     * This method checks whether the user is authenticated and sends
-     * the identity file.
-     */
-    private void getSerial( APDU apdu )
-    {
-        //If the pin is not validated, a response APDU with the
-        //'SW_PIN_VERIFICATION_REQUIRED' status word is transmitted.
-        if ( !pin.isValidated() ) ISOException.throwIt( SW_PIN_VERIFICATION_REQUIRED );
-        else
-        {
-            //This sequence of three methods sends the data contained in
-            //'identityFile' with offset '0' and length 'identityFile.length'
-            //to the host application.
-            apdu.setOutgoing();
-            apdu.setOutgoingLength( ( short ) serial.length );
-            apdu.sendBytesLong( serial, ( short ) 0, ( short ) serial.length );
         }
     }
 }
