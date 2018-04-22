@@ -5,31 +5,37 @@ import be.msec.smartcard.IdentityCard;
 import be.msec.timestamp.SignedTimestamp;
 import com.licel.jcardsim.base.Simulator;
 import javacard.framework.AID;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputDialog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.smartcardio.CommandAPDU;
-import javax.smartcardio.ResponseAPDU;
+import javax.smartcardio.*;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
-public class Controller
+public class Controller implements Runnable
 {
     private static final Logger LOGGER = LoggerFactory.getLogger( Controller.class );
 
     @FXML
-    private Button pinButton;
+    private Button updateButton;
 
     @FXML
     private TextArea logPanel;
 
-    @FXML
-    private PasswordField pinField;
-
     private Simulator simulator;
+
+    //private CardChannel channel;
 
     private SSLClient serviceProvider;
 
@@ -38,9 +44,9 @@ public class Controller
     }
 
     @FXML
-    public void initialize()
+    public void initialize() throws CardException
     {
-        serviceProvider = new SSLClient( "127.0.0.1", 1271 );
+
 
         simulator = new Simulator();
 
@@ -49,7 +55,23 @@ public class Controller
 
         simulator.selectApplet( appletAID );
 
-        write( "Simulator loaded." );
+
+        /*
+        // show the list of available terminals
+        TerminalFactory    factory   = TerminalFactory.getDefault();
+        List<CardTerminal> terminals = factory.terminals().list();
+        System.out.println("Terminals: " + terminals);
+        // get the first terminal
+        CardTerminal terminal = terminals.get(0);
+        // establish a connection with the card
+        Card card = terminal.connect("T=0");
+        System.out.println("card: " + card);
+        channel = card.getBasicChannel();
+        */
+
+        System.out.println(new Date());
+
+        write( "Card loaded." );
 
         CommandAPDU  commandAPDU;
         ResponseAPDU response;
@@ -64,192 +86,215 @@ public class Controller
         write( "Testing time" );
 
         commandAPDU = new CommandAPDU( 0x80, 0x26, 0x00, 0x00, time );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        response =  transmit( commandAPDU );
 
         write( "Time needs update = " + Arrays.toString( response.getData() ) );
 
         buffer = new byte[ time.length + now.getSignature().length ];
-        for(int i = 0; i < time.length; i++ )
-            buffer[i] = time[i];
-        for(int i = 0; i < now.getSignature().length; i++ )
-            buffer[i + time.length] = now.getSignature()[i];
+        for ( int i = 0; i < time.length; i++ )
+            buffer[ i ] = time[ i ];
+        for ( int i = 0; i < now.getSignature().length; i++ )
+            buffer[ i + time.length ] = now.getSignature()[ i ];
 
         updateTransientBuffer( buffer );
 
         write( "Updating and verifying signed timestamp" );
 
-        commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00  );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
 
-        System.out.println( Arrays.toString(response.getData()));
+        commandAPDU = new CommandAPDU( 0x80, 0x27, 0x00, 0x00 );
+        response = transmit( commandAPDU );
 
-        write( "Correct signature: " + (response.getData()[0] == 0) + " statuscode:" + response.getData()[0] );
+        System.out.println( Arrays.toString( response.getData() ) );
 
+        write( "Correct signature: " + ( response.getData()[ 0 ] == 0 ) + " statuscode: " + response.getData()[ 0 ] );
 
-        write( "Uploading certificate" );
+        write( "===============================================================" );
+    }
 
-        try
-        {
+    private void receiveCertificate()
+    {
+        write( "Step 2: sending challenge" );
+        write( "Uploading ServiceProvider certificate" );
+        byte[]  result = ( ( ByteArray ) serviceProvider.receiveObject() ).getChallenge();
+        updateTransientBuffer( result );
+    }
 
-            /*
-            X509CertImpl cert = (X509CertImpl) serviceProvider.receiveObject();
+    private void exchangeChallenges( )
+    {
+        LOGGER.info( "Exchanging challenges" );
 
-            SSLUtil.createKeyStore( "GOV1_keys.jks", "password" );
-            X509CertImpl cert =  SSLUtil.getCertificate( "GOV1" );
-            byte[] signature = cert.getSignature();
-            byte[] certEncoded = SSLUtil.getInfo( "GOV1" );
-
-            buffer = new byte[ signature.length + certEncoded.length + 2 ];
-
-            buffer[0] = (byte)(certEncoded.length & 0xFF );
-            buffer[1] = (byte)((certEncoded.length >> 8) & 0xFF );
-
-            for( int i = 0; i < certEncoded.length; i++ )
-                buffer[i + 2] = certEncoded[i];
-
-            for( int i = 0; i < signature.length; i++ )
-                buffer[i + certEncoded.length + 2] = signature[i];
-            */
-
-            //receive certificate in compact form
-            buffer = ((ByteArray) serviceProvider.receiveObject()).getChallenge();
-
-            updateTransientBuffer( buffer );
-
-        }
-        catch ( Exception e )
-        {
-            e.printStackTrace();
-        }
+        byte[]       buffer;
+        CommandAPDU  commandAPDU;
+        ResponseAPDU response;
 
         commandAPDU = new CommandAPDU( 0x80, 0x50, 0x00, 0x00 );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        response = transmit( commandAPDU );
 
         write( response.toString() );
 
-        byte[] responseBuffer = new byte[1024];
+        byte[] responseBuffer = new byte[ 1024 ];
 
-        for (int i = 0; i < 4; i++)
+        for ( int i = 0; i < 4; i++ )
         {
-            commandAPDU = new CommandAPDU( 0x80, 0x32, 0x00, 0x00, new byte[]{ (byte) i } );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            commandAPDU = new CommandAPDU( 0x80, 0x32, 0x00, 0x00, new byte[]{ ( byte ) i } );
+            response = transmit( commandAPDU );
 
-            for (int j = 0; j < response.getData().length; j++)
-                responseBuffer[i * 240 + j] = response.getData()[j];
+            for ( int j = 0; j < response.getData().length; j++ )
+                responseBuffer[ i * 240 + j ] = response.getData()[ j ];
         }
 
+        serviceProvider.writeObject( new ByteArray( responseBuffer ) );
+
+        ByteArray byteArray = ( ByteArray ) serviceProvider.receiveObject();
+
+        write( "Received challenge response" );
+
+        commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
+        response = transmit( commandAPDU );
+
+        write( response.toString() );
+        write( "Validation challenge: " + response.getData()[ 0 ] );
+
+        write( "===============================================================" );
+
+        // STEP 3 ----------
+        byteArray = ( ByteArray ) serviceProvider.receiveObject();
+
+        write( "Step 3: received challenge" );
+        commandAPDU = new CommandAPDU( 0x80, 0x60, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
+        response = transmit( commandAPDU );
+
+        write( Arrays.toString(  response.getData() ) );
+
+        byte[] output = readTransientBuffer();
+
+        serviceProvider.writeObject( new ByteArray( output ) );
+
+        write( "Sent response to challenge." );
+
+    }
+
+    ByteArray mask;
+    private void listenForRequests()
+    {
         try
         {
-            // STEP 2 ----------
-
-            write( "Step 2: sending challenge" );
-
-            serviceProvider.writeObject( new ByteArray( responseBuffer ) );
-
-            /*
-            Cipher        rsaCipher  = Cipher.getInstance( "RSA/ECB/PKCS1PADDING" );
-            RSAPrivateKey privateKey = (RSAPrivateKey) SSLUtil.getPrivateKey( "GOV1" );
-
-            Cipher rsaCipher = Cipher.getInstance( "RSA/ECB/PKCS1PADDING" );
-            RSAPrivateKey privateKey = (RSAPrivateKey ) SSLUtil.getPrivateKey( "CUSTOM1" );
-            rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
-
-
-
-            rsaCipher.init( Cipher.DECRYPT_MODE, privateKey );
-
-            byte[] symmKey = rsaCipher.doFinal( responseBuffer, 0, 256 );
-
-            System.out.println( Arrays.toString( symmKey ) );
-
-            SecretKey       key    = new SecretKeySpec( symmKey, 0, 16, "AES" );
-            byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-            IvParameterSpec spec   = new IvParameterSpec( ivdata );
-            Cipher          cipher = Cipher.getInstance( "AES/CBC/NoPadding" );
-            cipher.init( Cipher.DECRYPT_MODE, key, spec );
-
-            byte result[] = cipher.doFinal( responseBuffer, 256, 32 );
-
-            for (int i = 0; i < result.length; i++)
-                result[i] += (byte) 1;
-
-            Cipher encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
-            encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
-            byte newChallenge[] = encryptCypher.doFinal( result, 0, 16 );
-            */
-
-            ByteArray byteArray = (ByteArray) serviceProvider.receiveObject();
-
-            write( "Received challenge response" );
-
-            commandAPDU = new CommandAPDU( 0x80, 0x51, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
-
-            write( response.toString() );
-            write( "Validation challenge: " + response.getData()[0] );
-
-            // STEP 3 ----------
-            byteArray = (ByteArray) serviceProvider.receiveObject();
-
-            write( "Step 3: received challenge" );
-            commandAPDU = new CommandAPDU( 0x80, 0x60, 0x00, 0x00, byteArray.getChallenge(), 0, 16 );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
-
-            System.out.println( Arrays.toString(response.getData()));
-
-            serviceProvider.writeObject( new ByteArray( response.getData() ) );
-
-            write("Sent response to challenge.");
-            /*
-            write( Arrays.toString( result ) );
-            System.out.println( Arrays.toString( result ) );
-            System.out.println( Arrays.toString( response.getData() ) );
-            */
-
-            //STEP 4 until the world ends
-            while ( serviceProvider.isAvailiable() )
-            {
-                ByteArray mask = (ByteArray) serviceProvider.receiveObject();
-
-                commandAPDU = new CommandAPDU( 0x80, 0x70, 0x00, 0x00, new byte[]{ 0x01, 0x02, 0x03, 0x04, mask.getChallenge()[0]} );
-                response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
-                System.out.println(Arrays.toString( response.getData()));
-
-                //TODO
-                //1 wrong pin
-                //2 not authenticated
-                //3 no permission
-                if ( response.getData()[0] == 0x00) {
-                    byte[] personalInformation = readTransientBuffer();
-                    System.out.println( Arrays.toString(personalInformation));
-                    serviceProvider.writeObject( new ByteArray( personalInformation ) );
-                } else
-                {
-                    serviceProvider.writeObject( new ByteArray( new byte[0] ) );
-                }
-
-
-
-            }
+            write( "===============================================================" );
+            mask = ( ByteArray ) serviceProvider.receiveObject();
+            write( "Received a request" );
         }
         catch ( Exception e )
         {
             e.printStackTrace();
         }
+    }
 
-        /*
-        commandAPDU = new CommandAPDU( 0x80, 0x22, 0x00, 0x00, new byte[]{ 0x01, 0x02, 0x03, 0x04 } );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+    private void exchangeAttributes()
+    {
+        Platform.runLater( () -> {
+            byte[]       buffer;
+            CommandAPDU  commandAPDU;
+            ResponseAPDU response;
 
-        write( response.toString() );
+            write( "Received the following request: " + mask.getChallenge()[ 0 ] );
 
-        commandAPDU = new CommandAPDU( 0x80, 0x24, 0x00, 0x00 );
-        response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            Optional<String> result = getPin( mask.getChallenge()[0] );
 
-        write( response.toString() );
+            if( result.isPresent() )
+            {
+                int pin = Integer.parseInt( result.get() );
 
-        write( new BigInteger( 1, response.getData() ).toString( 16 ) );
-        */
+                int i4 = pin - (pin / 10) * 10;
+                pin /= 10;
+                int i3 = pin - (pin / 10) * 10;
+                pin /= 10;
+                int i2 = pin - (pin / 10) * 10;
+                pin /= 10;
+                int i1 = pin - (pin / 10) * 10;
+
+                write( "PIN: " + i1 + "," + i2 + "," + i3 + "," + i4  );
+
+                commandAPDU = new CommandAPDU( 0x80, 0x70, 0x00, 0x00, new byte[]{ (byte)i1,(byte)i2,(byte)i3,(byte)i4, mask.getChallenge()[ 0 ] } );
+                response = transmit( commandAPDU );
+                System.out.println( Arrays.toString( response.getData() ) );
+
+
+                if ( response.getData()[ 0 ] == 0x00 )
+                {
+                    byte[] personalInformation = readTransientBuffer();
+                    int size = getEncodedSize( personalInformation );
+                    byte[] shortened = Arrays.copyOfRange( personalInformation, 0, 16 * ( size / 16 + 1 ) + 2 );
+                    System.out.println( Arrays.toString( personalInformation ) );
+                    serviceProvider.writeObject( new ByteArray( shortened ) );
+                }
+                else
+                {
+                    serviceProvider.writeObject( new ByteArray( new byte[ 0 ] ) );
+                }
+            }
+            else
+            {
+                serviceProvider.writeObject( new ByteArray( new byte[ 0 ] ) );
+            }
+
+            runLoop();
+        } );
+    }
+
+    public void runLoop()
+    {
+        new Thread( () -> {
+            listenForRequests();
+            exchangeAttributes();
+        }).start();
+    }
+
+    public void run()
+    {
+        System.out.println( "Connecting to SP" );
+        serviceProvider = new SSLClient( "127.0.0.1", 1271 );
+
+        new Thread( () -> {
+            receiveCertificate();
+            exchangeChallenges();
+            listenForRequests();
+            exchangeAttributes();
+        }).start();
+    }
+
+    private Optional<String> getPin( byte request )
+    {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle( "Enter PIN code" );
+
+        String requestedInfo = "Requested info: \n";
+
+        byte IDENTIFIER_BIT = ( byte ) ( 1 << 7 );
+        byte NAME_BIT       = ( byte ) ( 1 << 6 );
+        byte ADDRESS_BIT    = ( byte ) ( 1 << 5 );
+        byte COUNTRY_BIT    = ( byte ) ( 1 << 4 );
+        byte BIRTHDAY_BIT   = ( byte ) ( 1 << 3 );
+        byte AGE_BIT        = ( byte ) ( 1 << 2 );
+        byte GENDER_BIT     = ( byte ) ( 1 << 1 );
+        byte PICTURE_BIT    = ( byte ) ( 1 << 0 );
+        requestedInfo += ( byte ) ( request & IDENTIFIER_BIT ) != ( byte ) 0 ? "Identifier," : "";
+        requestedInfo += ( byte ) ( request & NAME_BIT ) != ( byte ) 0 ? "Name," : "";
+        requestedInfo += ( byte ) ( request & ADDRESS_BIT ) != ( byte ) 0 ? "Address," : "";
+        requestedInfo += ( byte ) ( request & COUNTRY_BIT ) != ( byte ) 0 ? "Country," : "";
+        requestedInfo += ( byte ) ( request & BIRTHDAY_BIT ) != ( byte ) 0 ? "Birthday," : "";
+        requestedInfo += ( byte ) ( request & AGE_BIT ) != ( byte ) 0 ? "Age," : "";
+        requestedInfo += ( byte ) ( request & GENDER_BIT ) != ( byte ) 0 ? "Gender," : "";
+        requestedInfo += ( byte ) ( request & PICTURE_BIT ) != ( byte ) 0 ? "Picture" : "";
+        dialog.setHeaderText( requestedInfo );
+
+        Optional <String> result = dialog.showAndWait();
+
+        while ( result.isPresent() && !result.get().matches( "\\d{4}" ) )
+        {
+            result = dialog.showAndWait();
+        }
+
+        return result;
     }
 
     private void updateTransientBuffer( byte[] buffer )
@@ -257,21 +302,21 @@ public class Controller
         write( "Clearing transient buffer" );
         // Clear buffer
         CommandAPDU  commandAPDU = new CommandAPDU( 0x80, 0x30, 0x00, 0x00 );
-        ResponseAPDU response    = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+        ResponseAPDU response    = transmit( commandAPDU );
 
         write( "Buffer clear, filling with new data" );
 
         int iterations = 0;
-        for (int i = 0; i < (buffer.length / 240); i++)
+        for ( int i = 0; i < ( buffer.length / 240 ); i++ )
         {
-            byte[] currentBuffer = new byte[241];
+            byte[] currentBuffer = new byte[ 241 ];
 
-            currentBuffer[0] = (byte) 240;
-            for (int j = 0; j < 240; j++)
-                currentBuffer[j + 1] = buffer[i * 240 + j];
+            currentBuffer[ 0 ] = ( byte ) 240;
+            for ( int j = 0; j < 240; j++ )
+                currentBuffer[ j + 1 ] = buffer[ i * 240 + j ];
 
             commandAPDU = new CommandAPDU( 0x80, 0x31, 0x00, 0x00, currentBuffer );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            response = transmit( commandAPDU );
 
             iterations++;
         }
@@ -279,14 +324,14 @@ public class Controller
         int sizeLeft = buffer.length - iterations * 240;
         if ( sizeLeft > 0 )
         {
-            byte[] currentBuffer = new byte[sizeLeft + 1];
+            byte[] currentBuffer = new byte[ sizeLeft + 1 ];
 
-            currentBuffer[0] = (byte) sizeLeft;
-            for (int j = 0; j < sizeLeft; j++)
-                currentBuffer[j + 1] = buffer[iterations * 240 + j];
+            currentBuffer[ 0 ] = ( byte ) sizeLeft;
+            for ( int j = 0; j < sizeLeft; j++ )
+                currentBuffer[ j + 1 ] = buffer[ iterations * 240 + j ];
 
             commandAPDU = new CommandAPDU( 0x80, 0x31, 0x00, 0x00, currentBuffer );
-            response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            response = transmit( commandAPDU );
         }
 
         write( "Buffer ready" );
@@ -300,25 +345,21 @@ public class Controller
      */
     public byte[] readTransientBuffer()
     {
-        byte[] responseBuffer = new byte[1024];
+        byte[] responseBuffer = new byte[ 1024 ];
 
-        for (int i = 0; i < 4; i++)
+        for ( int i = 0; i < 4; i++ )
         {
-            CommandAPDU commandAPDU = new CommandAPDU( 0x80, 0x32, 0x00, 0x00, new byte[]{ (byte) i } );
-            ResponseAPDU response = new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+            CommandAPDU  commandAPDU = new CommandAPDU( 0x80, 0x32, 0x00, 0x00, new byte[]{ ( byte ) i } );
+            ResponseAPDU response    = transmit( commandAPDU );
 
-            for (int j = 0; j < response.getData().length; j++)
-                responseBuffer[i * 240 + j] = response.getData()[j];
+            for ( int j = 0; j < response.getData().length; j++ )
+                responseBuffer[ i * 240 + j ] = response.getData()[ j ];
         }
 
-        int size = getEncodedSize( responseBuffer );
-
-        byte[] shortened = Arrays.copyOfRange(responseBuffer, 0, 16 * (size / 16 + 1) + 2 );
-
-        return shortened;
+        return responseBuffer;
     }
 
-    private short getEncodedSize(byte[] buffer)
+    private short getEncodedSize( byte[] buffer )
     {
         return ( short ) ( ( short ) ( ( buffer[ 1 ] & 0xff ) << 8 ) | ( ( short ) buffer[ 0 ] & 0xff ) );
     }
@@ -337,7 +378,7 @@ public class Controller
         SSLClient timestampClient = new SSLClient( "127.0.0.1", 1207 );
         LOGGER.info( "Connected, fetching timestamp" );
 
-        SignedTimestamp timestamp = (SignedTimestamp) timestampClient.receiveObject();
+        SignedTimestamp timestamp = ( SignedTimestamp ) timestampClient.receiveObject();
         LOGGER.info( "Received object: " + timestamp );
 
         LOGGER.info( "Closing connection" );
@@ -348,11 +389,30 @@ public class Controller
 
     private void write( String text )
     {
-        logPanel.appendText( text + " \n" );
+        Platform.runLater( () -> logPanel.appendText( text + " \n" ) );
     }
 
     public void login()
     {
         logPanel.appendText( "Logging in \n" );
+    }
+
+    private ResponseAPDU transmit(CommandAPDU commandAPDU)
+    {
+         return new ResponseAPDU( simulator.transmitCommand( commandAPDU.getBytes() ) );
+
+        /*
+        try
+        {
+            return channel.transmit( commandAPDU );
+        }
+        catch ( CardException e )
+        {
+            LOGGER.error( "Could not transmit. {}", e.getMessage() );
+            e.printStackTrace();
+        }
+
+        return null;
+        */
     }
 }

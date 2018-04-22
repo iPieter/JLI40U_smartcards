@@ -2,10 +2,13 @@ package be.msec;
 
 import be.msec.SP.Card;
 import javafx.application.Application;
+import javafx.event.EventHandler;
+import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.stage.WindowEvent;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
@@ -59,7 +62,7 @@ public class Main extends Application
                 socket.close();
                 */
 
-                FileInputStream fis         = new FileInputStream( "vincentje.jpeg" );
+                FileInputStream fis         = new FileInputStream( "bob.jpg" );
                 int              currentByte = 0;
                 int              idx         = 0;
                 byte[]           tmp         = new byte[1000];
@@ -130,7 +133,13 @@ public class Main extends Application
     @Override
     public void start( Stage stage ) throws Exception
     {
-        Parent root = FXMLLoader.load( getClass().getResource( "/scene.fxml" ) );
+        FXMLLoader loader = new FXMLLoader();
+        loader.setLocation( getClass().getResource( "/scene.fxml" ) );
+        Parent root = loader.load();
+        Controller controller = loader.getController();
+
+        stage.addEventHandler(WindowEvent.WINDOW_SHOWN, window -> controller.run() );
+
         stage.setTitle( "Middleware" );
         stage.setScene( new Scene( root ) );
         stage.show();
