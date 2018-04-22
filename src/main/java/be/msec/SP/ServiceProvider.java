@@ -12,7 +12,10 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
@@ -38,6 +41,8 @@ public class ServiceProvider
     private ObjectInputStream  is;
     private ObjectOutputStream os;
 
+    private boolean headlessMode = false;
+
     private SSLSocket c;
 
     private byte[] symmetricKey;
@@ -49,23 +54,18 @@ public class ServiceProvider
         try
         {
             serviceProvider.initAMQP();
-            serviceProvider.startSSLServer();
         }
         catch ( IOException | TimeoutException e )
         {
             LOGGER.info( "starting headless" );
-            String message = "DEFAULT1";
-
-            //step 1
-            serviceProvider.sendCertificate( message );
-
-            //step 2
-            serviceProvider.respondChallenge( message );
-
-            //step 3
-            serviceProvider.sendChallenge( message );
+            serviceProvider.setHeadlessMode( true );
         }
-        serviceProvider.close();
+        finally
+        {
+            serviceProvider.startSSLServer();
+            serviceProvider.close();
+
+        }
     }
 
     private void initAMQP() throws IOException, TimeoutException
@@ -214,6 +214,24 @@ public class ServiceProvider
                 os = new ObjectOutputStream( c.getOutputStream() );
 
                 LOGGER.info( "Opened ssl stream" );
+
+                if ( headlessMode )
+                {
+                    String message = "DEFAULT1";
+                    LOGGER.info( "No broker, using {} as service provider.", message );
+
+                    //step 1
+                    sendCertificate( message );
+
+                    //step 2
+                    respondChallenge( message );
+
+                    //step 3
+                    sendChallenge( message );
+
+                    //step 4
+                    requestPersonalInformation();
+                }
             }
 
 
@@ -262,9 +280,9 @@ public class ServiceProvider
     {
         try
         {
-            log( "Waiting for challenge" );
+            log( "Waiting for symmetric key and challenge" );
             byte[] responseBuffer = ((ByteArray) is.readObject()).getChallenge();
-            log( "Received challenge" );
+            log( "Received symmetric key and challenge (encrypted)" );
 
             SSLUtil.createKeyStore( identifier + "_keys.jks", "password" );
 
@@ -277,7 +295,7 @@ public class ServiceProvider
 
             symmetricKey = symmKey;
 
-            System.out.println( Arrays.toString( symmKey ) );
+            log( "Decrypted symmetric key" );
 
             SecretKey       key    = new SecretKeySpec( symmKey, 0, 16, "AES" );
             byte[]          ivdata = new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -290,11 +308,13 @@ public class ServiceProvider
             for (int i = 0; i < result.length; i++)
                 result[i] += (byte) 1;
 
+            log( "Decrypted challenge and increased each byte with 1" );
+
             Cipher encryptCypher = Cipher.getInstance( "AES/CBC/NoPadding" );
             encryptCypher.init( Cipher.ENCRYPT_MODE, key, spec );
             byte newChallenge[] = encryptCypher.doFinal( result, 0, 16 );
 
-            log( "Wrote newChallenge" );
+            log( "Wrote challenge" );
             os.writeObject( new ByteArray( newChallenge ) );
         }
         catch ( Exception e )
@@ -303,9 +323,9 @@ public class ServiceProvider
         }
     }
 
-    private short getEncodedSize(byte[] buffer)
+    private short getEncodedSize( byte[] buffer )
     {
-        return ( short ) ( ( short ) ( ( buffer[ 1 ] & 0xff ) << 8 ) | ( ( short ) buffer[ 0 ] & 0xff ) );
+        return (short) ((short) ((buffer[1] & 0xff) << 8) | ((short) buffer[0] & 0xff));
     }
 
     private void requestPersonalInformation()
@@ -333,16 +353,19 @@ public class ServiceProvider
                     byte result[] = cipher.doFinal( responseBuffer, 2, responseBuffer.length - 2 );
 
                     log( "received info for " + i );
-                    channel.basicPublish( "amq.topic", "data", null,
-                            new IdentityInformation(Arrays.copyOfRange( result, 0, getEncodedSize( responseBuffer ) ), mask[0]).generateJsonRepresentation() );
+
+                    if ( channel != null )
+                        channel.basicPublish( "amq.topic", "data", null,
+                                new IdentityInformation( Arrays.copyOfRange( result, 0, getEncodedSize( responseBuffer ) ), mask[0] ).generateJsonRepresentation() );
 
                 }
                 else
                 {
                     log( "invalid request for data " + i );
 
-                    channel.basicPublish( "amq.topic", "data", null,
-                            new IdentityInformation(mask[0]).generateJsonRepresentation() );
+                    if ( channel != null )
+                        channel.basicPublish( "amq.topic", "data", null,
+                                new IdentityInformation( mask[0] ).generateJsonRepresentation() );
 
                 }
 
@@ -382,6 +405,9 @@ public class ServiceProvider
 
         }
 
+        log( "End session, clearing symmetric key and closing connection" );
+        symmetricKey = null;
+        close();
     }
 
     private void log( String event )
@@ -389,8 +415,9 @@ public class ServiceProvider
         LOGGER.info( event );
         try
         {
-            channel.basicPublish( "amq.topic", "card", null,
-                    new Event( Event.Level.SUCCESS, event ).generateJsonRepresentation() );
+            if ( channel != null )
+                channel.basicPublish( "amq.topic", "card", null,
+                        new Event( Event.Level.SUCCESS, event ).generateJsonRepresentation() );
         }
         catch ( IOException e )
         {
@@ -404,8 +431,12 @@ public class ServiceProvider
     {
         try
         {
-            channel.close();
-            connection.close();
+            if ( channel != null )
+                channel.close();
+
+            if ( connection != null )
+                connection.close();
+
             is.close();
             os.close();
             c.close();
@@ -419,5 +450,15 @@ public class ServiceProvider
         {
             e.printStackTrace();
         }
+    }
+
+    public boolean isHeadlessMode()
+    {
+        return headlessMode;
+    }
+
+    public void setHeadlessMode( boolean headlessMode )
+    {
+        this.headlessMode = headlessMode;
     }
 }
