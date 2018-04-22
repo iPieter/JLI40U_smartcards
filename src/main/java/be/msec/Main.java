@@ -34,7 +34,7 @@ public class Main extends Application
 
     public static void main( String[] args )
     {
-        boolean PRINT_SHITTY_KEY = true;
+        boolean PRINT_SHITTY_KEY = false;
 
         if ( PRINT_SHITTY_KEY )
         {
@@ -62,7 +62,7 @@ public class Main extends Application
                 socket.close();
                 */
 
-                FileInputStream fis         = new FileInputStream( "vincentje.jpeg" );
+                FileInputStream fis         = new FileInputStream( "bob.jpg" );
                 int              currentByte = 0;
                 int              idx         = 0;
                 byte[]           tmp         = new byte[1000];
